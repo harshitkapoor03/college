@@ -5,7 +5,7 @@ import asyncio
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastmcp import FastMCP
-from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
+from fastmcp.server.auth.providers.jwt import JWTVerifier, RSAKeyPair
 from mcp.server.auth.provider import AccessToken
 import httpx
 
@@ -18,21 +18,29 @@ assert TOKEN, "Please set AUTH_TOKEN in .env"
 assert MY_NUMBER, "Please set MY_NUMBER in .env"
 
 # --- Auth Provider ---
-class SimpleBearerAuth(BearerAuthProvider):
+class SimpleJWTAuth(JWTVerifier):
     def __init__(self, token: str):
         k = RSAKeyPair.generate()
-        super().__init__(public_key=k.public_key, jwks_uri=None, issuer=None, audience=None)
+        super().__init__(
+            public_key=k.public_key,
+            jwks_uri=None,
+            issuer=None,
+            audience=None
+        )
         self.token = token
 
     async def load_access_token(self, token: str) -> AccessToken | None:
         if token == self.token:
-            return AccessToken(token=token, client_id=MY_NUMBER, scopes=["*"], expires_at=None)
+            return AccessToken(
+                token=token,
+                client_id=MY_NUMBER,
+                scopes=["*"],
+                expires_at=None
+            )
         return None
 
 # --- MCP Server ---
-mcp = FastMCP("College Quiz MCP Server", auth=SimpleBearerAuth(TOKEN))
-app = FastAPI()
-app.mount("/mcp", mcp.app)
+mcp = FastMCP("College Quiz MCP Server", auth=SimpleJWTAuth(TOKEN))
 
 # --- SQLite leaderboard ---
 conn = sqlite3.connect("leaderboard.db", check_same_thread=False)
@@ -45,22 +53,12 @@ conn.commit()
 # --- In-memory quiz state ---
 active_quizzes: dict[str, dict] = {}
 
-def get_client_id_safe():
-    """Safely get client_id from last message without crashing after reconnects."""
-    try:
-        msg = mcp.last_message()
-        if msg and hasattr(msg, "access_token") and msg.access_token:
-            return msg.access_token.client_id
-    except Exception:
-        pass
-    return "unknown"
-
 # --- Tool: validate ---
 @mcp.tool
 async def validate() -> str:
-    return get_client_id_safe()
+    return MY_NUMBER
 
-# --- Fetch dynamic questions from Open Trivia DB ---
+# --- Fetch dynamic questions ---
 async def fetch_questions():
     questions = []
     async with httpx.AsyncClient() as client:
@@ -85,10 +83,12 @@ async def fetch_questions():
 
 # --- Tool: enter_competition ---
 @mcp.tool
-async def enter_competition(college: str | None = None, answer: int | None = None) -> str:
-    phone = get_client_id_safe()
+async def enter_competition(
+    college: str | None = None,
+    answer: int | None = None
+) -> str:
+    phone = mcp.last_message().access_token.client_id
 
-    # Main menu
     if phone not in active_quizzes and college is None and answer is None:
         return (
             "🏁 Main Menu:\n"
@@ -96,7 +96,6 @@ async def enter_competition(college: str | None = None, answer: int | None = Non
             "• View Leaderboard → @show_leaderboard"
         )
 
-    # College selection
     if college and phone not in active_quizzes:
         mapping = {"A": "BITS", "B": "P", "C": "G/H"}
         col = mapping.get(college.upper())
@@ -113,7 +112,6 @@ async def enter_competition(college: str | None = None, answer: int | None = Non
             "Reply with @enter_competition answer=<number>"
         )
 
-    # Answer handling
     if answer is not None and phone in active_quizzes:
         session = active_quizzes[phone]
         idx = session["current"]
@@ -129,7 +127,6 @@ async def enter_competition(college: str | None = None, answer: int | None = Non
         session["current"] += 1
         idx = session["current"]
 
-        # Quiz complete
         if idx >= len(session["questions"]):
             col = session["college"]
             del active_quizzes[phone]
@@ -141,7 +138,6 @@ async def enter_competition(college: str | None = None, answer: int | None = Non
                 "• View Leaderboard → @show_leaderboard"
             )
 
-        # Next question
         qd = session["questions"][idx]
         opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(qd["choices"]))
         return (
@@ -151,7 +147,6 @@ async def enter_competition(college: str | None = None, answer: int | None = Non
             "Reply with @enter_competition answer=<number>"
         )
 
-    # Fallback
     return "Use @enter_competition to start or @show_leaderboard to view rankings."
 
 # --- Tool: show_leaderboard ---
@@ -163,22 +158,15 @@ async def show_leaderboard() -> str:
     lines = [f"{c}: {s}" for c, s in rows]
     return "🏆 Leaderboard 🏆\n" + "\n".join(lines)
 
-# --- Dummy /register endpoint ---
-@app.post("/register")
-async def register():
-    return {"access_token": TOKEN, "token_type": "bearer"}
+# --- ASGI app & MCP mount ---
+app = FastAPI()
+app.mount("/mcp", mcp.asgi_app())
 
-# --- Dummy OpenID discovery endpoints ---
-@app.get("/.well-known/oauth-authorization-server")
-async def oauth_server_info():
-    return {"issuer": "college-quiz-mcp", "jwks_uri": "https://example.com/jwks"}
+# Health check
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
-@app.get("/.well-known/openid-configuration")
-async def openid_config():
-    return {"issuer": "college-quiz-mcp", "jwks_uri": "https://example.com/jwks"}
-
-# --- Run everything ---
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 Starting College Quiz MCP on http://0.0.0.0:8086")
     uvicorn.run(app, host="0.0.0.0", port=8086)
