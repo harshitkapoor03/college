@@ -149,4 +149,4 @@ async def show_leaderboard() -> str:
 
 # 10. Run the server
 if __name__ == "__main__":
-    asyncio.run(mcp.run_async("streamable-http", host="0.0.0.0", port=8086, base_path="/mcp"))
+    asyncio.run(mcp.run_async("streamable-http", host="0.0.0.0", port=8086))
