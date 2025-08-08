@@ -2,9 +2,10 @@ import os, random, sqlite3, asyncio
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from fastmcp.server.auth.providers.jwt import JWTVerifier, RSAKeyPair
-from fastmcp.server.auth.models import AccessToken  # Corrected import path
+from fastmcp.auth.models import AccessToken  # ✅ Updated import
 import httpx
 from fastapi import FastAPI
+import uvicorn
 
 # 1. Load credentials
 load_dotenv()
@@ -26,7 +27,7 @@ class SimpleBearerAuth(JWTVerifier):
                 client_id=MY_NUMBER,
                 scopes=["*"],
                 expires_at=None,
-                claims={}  # Add empty claims dictionary
+                claims={}  # Empty claims
             )
         return None
 
@@ -46,14 +47,14 @@ app.mount("/mcp", mcp.app)
 conn = sqlite3.connect("leaderboard.db", check_same_thread=False)
 cur = conn.cursor()
 cur.execute("CREATE TABLE IF NOT EXISTS colleges(college TEXT PRIMARY KEY, total_score INTEGER)")
-for c in ("BITS","P","G/H"):
+for c in ("BITS", "P", "G/H"):
     cur.execute("INSERT OR IGNORE INTO colleges VALUES(?,0)", (c,))
 conn.commit()
 
 # 5. In-memory quiz state
 active_quizzes: dict[str, dict] = {}
 
-# 6. validate tool (required by Puch AI)
+# 6. validate tool
 @mcp.tool
 async def validate() -> str:
     return MY_NUMBER
@@ -62,7 +63,7 @@ async def validate() -> str:
 async def fetch_questions():
     questions = []
     async with httpx.AsyncClient() as client:
-        for diff,count in (("easy",1),("medium",1),("hard",3)):
+        for diff, count in (("easy", 1), ("medium", 1), ("hard", 3)):
             resp = await client.get(
                 "https://opentdb.com/api.php",
                 params={"amount": count, "difficulty": diff, "type": "multiple"},
@@ -81,7 +82,7 @@ async def fetch_questions():
                 })
     return questions
 
-# 8. Public tool: single entry point
+# 8. Main competition entry tool
 @mcp.tool
 async def enter_competition(
     college: str | None = None,
@@ -99,14 +100,14 @@ async def enter_competition(
 
     # College selection
     if college and phone not in active_quizzes:
-        mapping = {"A":"BITS","B":"P","C":"G/H"}
+        mapping = {"A": "BITS", "B": "P", "C": "G/H"}
         col = mapping.get(college.upper())
         if not col:
             return "Invalid choice. Use A, B, or C."
         qs = await fetch_questions()
-        active_quizzes[phone] = {"college":col, "questions":qs, "current":0}
+        active_quizzes[phone] = {"college": col, "questions": qs, "current": 0}
         qd = qs[0]
-        opts = "\n".join(f"{i+1}. {opt}" for i,opt in enumerate(qd["choices"]))
+        opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(qd["choices"]))
         return (
             f"Quiz for {col}:\n"
             f"Q1 ({qd['diff']}): {qd['q']}\n"
@@ -144,7 +145,7 @@ async def enter_competition(
 
         # Next question
         qd = session["questions"][idx]
-        opts = "\n".join(f"{i+1}. {opt}" for i,opt in enumerate(qd["choices"]))
+        opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(qd["choices"]))
         return (
             f"{feedback}\n"
             f"Q{idx+1} ({qd['diff']}): {qd['q']}\n"
@@ -155,15 +156,15 @@ async def enter_competition(
     # Fallback
     return "Use @enter_competition to start or @show_leaderboard to view rankings."
 
-# 9. Public tool: leaderboard
+# 9. Leaderboard tool
 @mcp.tool
 async def show_leaderboard() -> str:
     rows = cur.execute(
         "SELECT college,total_score FROM colleges ORDER BY total_score DESC"
     ).fetchall()
-    lines = [f"{c}: {s}" for c,s in rows]
+    lines = [f"{c}: {s}" for c, s in rows]
     return "🏆 Leaderboard 🏆\n" + "\n".join(lines)
 
 # 10. Run the server
 if __name__ == "__main__":
-    asyncio.run(app.run_async(host="0.0.0.0", port=8086))
+    uvicorn.run(app, host="0.0.0.0", port=8086)
