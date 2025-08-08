@@ -102,7 +102,7 @@ async def enter_competition(
     college: str | None = None,
     answer: int | None = None
 ) -> str:
-    phone = mcp.last_message().access_token.client_id
+    phone = MY_NUMBER#mcp.last_message().access_token.client_id
 
     # Main menu
     if phone not in active_quizzes and college is None and answer is None:
@@ -195,3 +195,4 @@ async def show_leaderboard() -> str:
 # --- Run MCP Server ---
 if __name__ == "__main__":
     asyncio.run(mcp.run_async("streamable-http", host="0.0.0.0", port=8086))
+
