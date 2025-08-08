@@ -4,20 +4,37 @@ import sqlite3
 import asyncio
 from dotenv import load_dotenv
 from fastmcp import FastMCP
+from fastmcp.server.auth.providers.jwt import JWTVerifier, JWTVerifierSettings
 import httpx
 
-# --- Load environment variables ---
+# ── ENVIRONMENT VARIABLES ─────────────
 load_dotenv()
 TOKEN = os.getenv("AUTH_TOKEN")
 MY_NUMBER = os.getenv("MY_NUMBER")
+assert TOKEN and MY_NUMBER, "Set AUTH_TOKEN and MY_NUMBER in .env"
 
-assert TOKEN, "Please set AUTH_TOKEN in .env"
-assert MY_NUMBER, "Please set MY_NUMBER in .env"
+# ── JWT AUTH PROVIDER SETUP ───────────
+jwt_settings = JWTVerifierSettings(
+    issuer="puchai",
+    audiences=["puchai-mcp"],
+    jwks_uri=None,
+    algorithms=["HS256"],
+)
+verifier = JWTVerifier(jwt_settings)
 
-# --- MCP Server with Bearer Token ---
-mcp = FastMCP("College Quiz MCP Server", bearer_token=TOKEN)
+# Accepts only your static AUTH_TOKEN (custom)
+async def load_access_token(token: str):
+    if token == TOKEN:
+        return {"client_id": MY_NUMBER, "scopes": ["*"]}
+    return None
 
-# --- SQLite leaderboard ---
+verifier.load_access_token = load_access_token
+
+# ── FASTMCP SERVER ────────────────────
+mcp = FastMCP("College Quiz MCP Server", auth=verifier)
+
+
+# ── SQLITE LEADERBOARD ────────────────
 conn = sqlite3.connect("leaderboard.db", check_same_thread=False)
 cur = conn.cursor()
 cur.execute("CREATE TABLE IF NOT EXISTS colleges(college TEXT PRIMARY KEY, total_score INTEGER)")
@@ -25,98 +42,86 @@ for c in ("BITS", "P", "G/H"):
     cur.execute("INSERT OR IGNORE INTO colleges VALUES(?, 0)", (c,))
 conn.commit()
 
-# --- In-memory quiz state ---
-active_quizzes: dict[str, dict] = {}
 
-# --- Tool: validate (required by Puch) ---
+# ── IN-MEMORY ACTIVE QUIZ STATE ───────
+active_quizzes = {}
+
+
+# ── TOOL: validate (required by Puch AI) ──
 @mcp.tool
-def validate() -> str:
+async def validate() -> str:
     return MY_NUMBER
 
-# --- Fetch dynamic questions from Open Trivia DB ---
+
+# ── DYNAMIC QUESTION FETCH (Open Trivia DB) ──
 async def fetch_questions():
     questions = []
-    try:
-        async with httpx.AsyncClient() as client:
-            for diff, count in (("easy", 1), ("medium", 1), ("hard", 3)):
-                resp = await client.get(
-                    "https://opentdb.com/api.php",
-                    params={"amount": count, "difficulty": diff, "type": "multiple"},
-                    timeout=10
-                )
-                if resp.status_code == 200:
-                    data = resp.json().get("results", [])
-                    for item in data:
-                        q = item["question"].replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&")
-                        choices = item["incorrect_answers"] + [item["correct_answer"]]
-                        # Clean up HTML entities in choices
-                        choices = [choice.replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&") for choice in choices]
-                        correct_answer = item["correct_answer"].replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&")
-                        random.shuffle(choices)
-                        questions.append({
-                            "diff": diff.capitalize(),
-                            "q": q,
-                            "choices": choices,
-                            "ans": correct_answer
-                        })
-    except Exception as e:
-        print(f"Error fetching questions: {e}")
-        # Fallback questions if API fails
-        questions = [
+    async with httpx.AsyncClient() as client:
+        for diff, count in (("easy", 1), ("medium", 1), ("hard", 3)):
+            resp = await client.get(
+                "https://opentdb.com/api.php",
+                params={"amount": count, "difficulty": diff, "type": "multiple"},
+                timeout=10
+            )
+            if resp.status_code == 200:
+                data = resp.json().get("results", [])
+                for item in data:
+                    q = (item["question"]
+                         .replace("&quot;", '"')
+                         .replace("&#039;", "'")
+                         .replace("&amp;", "&"))
+                    choices = item["incorrect_answers"] + [item["correct_answer"]]
+                    choices = [ch.replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&") for ch in choices]
+                    correct = item["correct_answer"].replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&")
+                    random.shuffle(choices)
+                    questions.append({
+                        "diff": diff.capitalize(),
+                        "q": q,
+                        "choices": choices,
+                        "ans": correct,
+                    })
+    if len(questions) < 5:  # Fallback if not enough
+        questions += [
             {"diff": "Easy", "q": "What is 2 + 2?", "choices": ["3", "4", "5", "6"], "ans": "4"},
             {"diff": "Medium", "q": "What is the capital of France?", "choices": ["London", "Berlin", "Paris", "Madrid"], "ans": "Paris"},
-            {"diff": "Hard", "q": "What is the derivative of x²?", "choices": ["x", "2x", "x²", "2"], "ans": "2x"},
-            {"diff": "Hard", "q": "What is the square root of 144?", "choices": ["10", "11", "12", "13"], "ans": "12"},
-            {"diff": "Hard", "q": "What year did World War II end?", "choices": ["1944", "1945", "1946", "1947"], "ans": "1945"}
-        ]
+            {"diff": "Hard", "q": "Derivative of x²?", "choices": ["x", "2x", "x²", "2"], "ans": "2x"},
+            {"diff": "Hard", "q": "Square root of 144?", "choices": ["10", "11", "12", "13"], "ans": "12"},
+            {"diff": "Hard", "q": "Year WWII ended?", "choices": ["1944", "1945", "1946", "1947"], "ans": "1945"},
+        ][:5-len(questions)]
     return questions
 
-# --- Tool: enter_competition ---
+
+# ── MAIN PUBLIC QUIZ TOOL ──────────────
 @mcp.tool
-def enter_competition(
-    college: str = None,
-    answer: int = None
+async def enter_competition(
+    college: str | None = None,
+    answer: int | None = None
 ) -> str:
-    # Use a simple phone number simulation since we can't access request context reliably
-    phone = "default_user"  # In production, this would come from the authenticated user
-    
-    # Main menu
+    phone = mcp.last_message().access_token["client_id"]
+
+    # Show Main Menu
     if phone not in active_quizzes and college is None and answer is None:
         return (
-            "🏁 Welcome to College Quiz Competition!\n\n"
-            "🏛️ Available Colleges:\n"
-            "• A. BITS\n"
-            "• B. P\n" 
-            "• C. G/H\n\n"
-            "📝 To start: @enter_competition college=A\n"
-            "📊 View leaderboard: @show_leaderboard"
+            "🏁 Main Menu:\n"
+            "• Start Competition → @enter_competition college=<A|B|C>\n"
+            "• View Leaderboard → @show_leaderboard"
         )
 
-    # College selection
+    # College selection: start quiz
     if college and phone not in active_quizzes:
         mapping = {"A": "BITS", "B": "P", "C": "G/H"}
         col = mapping.get(college.upper())
         if not col:
-            return "❌ Invalid choice. Please use A (BITS), B (P), or C (G/H)."
-        
-        # This is a simplified version - in production you'd use asyncio.create_task
-        # For now, let's use fallback questions
-        qs = [
-            {"diff": "Easy", "q": "What is 2 + 2?", "choices": ["3", "4", "5", "6"], "ans": "4"},
-            {"diff": "Medium", "q": "What is the capital of France?", "choices": ["London", "Berlin", "Paris", "Madrid"], "ans": "Paris"},
-            {"diff": "Hard", "q": "What is the derivative of x²?", "choices": ["x", "2x", "x²", "2"], "ans": "2x"},
-            {"diff": "Hard", "q": "What is the square root of 144?", "choices": ["10", "11", "12", "13"], "ans": "12"},
-            {"diff": "Hard", "q": "What year did World War II end?", "choices": ["1944", "1945", "1946", "1947"], "ans": "1945"}
-        ]
-        
+            return "❌ Invalid college. Use A (BITS), B (P), or C (G/H)."
+        qs = await fetch_questions()
         active_quizzes[phone] = {"college": col, "questions": qs, "current": 0}
         qd = qs[0]
         opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(qd["choices"]))
         return (
-            f"🎓 Starting quiz for {col}!\n\n"
-            f"Q1 ({qd['diff']}): {qd['q']}\n\n"
-            f"{opts}\n\n"
-            "💡 Answer with: @enter_competition answer=1"
+            f"🎓 Quiz for {col}!\n"
+            f"Q1 ({qd['diff']}): {qd['q']}\n"
+            f"{opts}\n"
+            "Reply with @enter_competition answer=<number>"
         )
 
     # Answer handling
@@ -124,71 +129,65 @@ def enter_competition(
         session = active_quizzes[phone]
         idx = session["current"]
         qd = session["questions"][idx]
-        
-        if answer < 1 or answer > len(qd["choices"]):
-            return f"❌ Invalid answer. Please choose 1-{len(qd['choices'])}"
-        
-        correct = (qd["choices"][answer-1] == qd["ans"])
-        feedback = "✅ Correct! +10 pts." if correct else f"❌ Wrong. Correct answer: {qd['ans']}"
-        
-        if correct:
+        if not (1 <= answer <= len(qd["choices"])):
+            return f"❌ Invalid! Pick 1-{len(qd['choices'])}."
+        is_correct = (qd["choices"][answer-1] == qd["ans"])
+        feedback = "✅ Correct! +10 pts." if is_correct else f"❌ Wrong. Correct: {qd['ans']}"
+        if is_correct:
             cur.execute(
                 "UPDATE colleges SET total_score = total_score + 10 WHERE college = ?",
                 (session["college"],)
             )
             conn.commit()
-            
         session["current"] += 1
         idx = session["current"]
-
-        # Quiz complete
+        # Quiz completed
         if idx >= len(session["questions"]):
             col = session["college"]
-            total_score = cur.execute("SELECT total_score FROM colleges WHERE college = ?", (col,)).fetchone()[0]
             del active_quizzes[phone]
+            total = cur.execute("SELECT total_score FROM colleges WHERE college = ?", (col,)).fetchone()[0]
             return (
                 f"{feedback}\n\n"
-                f"🎉 Quiz complete for {col}!\n"
-                f"🏛️ {col} total score: {total_score}\n\n"
+                f"🎉 Quiz complete for {col}! Total: {total}\n\n"
                 "🏁 Main Menu:\n"
-                "📝 New quiz: @enter_competition\n"
-                "📊 Leaderboard: @show_leaderboard"
+                "• Start Competition → @enter_competition college=<A|B|C>\n"
+                "• View Leaderboard → @show_leaderboard"
             )
-
         # Next question
         qd = session["questions"][idx]
         opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(qd["choices"]))
         return (
-            f"{feedback}\n\n"
-            f"Q{idx+1} ({qd['diff']}): {qd['q']}\n\n"
-            f"{opts}\n\n"
-            f"💡 Answer with: @enter_competition answer=<number>"
+            f"{feedback}\n"
+            f"Q{idx+1} ({qd['diff']}): {qd['q']}\n"
+            f"{opts}\n"
+            "Reply with @enter_competition answer=<number>"
         )
+
+    # If user tries to pick college while quiz in progress
+    if college and phone in active_quizzes:
+        return "You're already in a quiz! Finish answering the questions."
 
     # Fallback
     return (
-        "🏁 College Quiz Competition\n\n"
-        "📝 Start quiz: @enter_competition college=<A|B|C>\n"
-        "📊 View leaderboard: @show_leaderboard"
+        "Use @enter_competition college=<A|B|C> to start, or @show_leaderboard to view rankings."
     )
 
-# --- Tool: show_leaderboard ---
-@mcp.tool
-def show_leaderboard() -> str:
-    rows = cur.execute(
-        "SELECT college, total_score FROM colleges ORDER BY total_score DESC"
-    ).fetchall()
-    
-    if not any(score > 0 for _, score in rows):
-        return (
-            "🏆 College Competition Leaderboard\n\n"
-            "No scores yet! Be the first to compete!\n\n"
-            "📝 Start quiz: @enter_competition"
-        )
-    
-    lines = [f"🥇 {c}: {s} points" if i == 0 else f"🥈 {c}: {s} points" if i == 1 else f"🥉 {c}: {s} points" for i, (c, s) in enumerate(rows)]
-    return "🏆 College Competition Leaderboard\n\n" + "\n".join(lines)
 
-# --- Run MCP Server ---
+# ── LEADERBOARD TOOL ───────────────
+@mcp.tool
+async def show_leaderboard() -> str:
+    rows = cur.execute("SELECT college, total_score FROM colleges ORDER BY total_score DESC").fetchall()
+    if not any(score > 0 for _,score in rows):
+        return (
+            "🏆 College Competition Leaderboard\n"
+            "No scores yet—be the first!\n"
+            "Start quiz: @enter_competition college=<A|B|C>"
+        )
+    medals = ['🥇', '🥈', '🥉']
+    lines = [f"{medals[i] if i < 3 else ''} {c}: {s} points" for i, (c,s) in enumerate(rows)]
+    return "🏆 College Competition Leaderboard\n" + "\n".join(lines)
+
+
+# ── RUN THE SERVER ─────────────────
 if __name__ == "__main__":
-    mcp.run()
+    asyncio.run(mcp.run_async("streamable-http", host="0.0.0.0", port=8086))
