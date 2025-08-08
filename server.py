@@ -1,17 +1,22 @@
-import os, random, sqlite3, asyncio
+import os
+import random
+import sqlite3
+import asyncio
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
 from mcp.server.auth.provider import AccessToken
 import httpx
 
-# 1. Load credentials
+# --- Load environment variables ---
 load_dotenv()
 TOKEN = os.getenv("AUTH_TOKEN")
 MY_NUMBER = os.getenv("MY_NUMBER")
-assert TOKEN and MY_NUMBER, "Set AUTH_TOKEN and MY_NUMBER in .env"
 
-# 2. Authentication Provider
+assert TOKEN, "Please set AUTH_TOKEN in .env"
+assert MY_NUMBER, "Please set MY_NUMBER in .env"
+
+# --- Auth Provider ---
 class SimpleBearerAuth(BearerAuthProvider):
     def __init__(self, token: str):
         k = RSAKeyPair.generate()
@@ -23,26 +28,26 @@ class SimpleBearerAuth(BearerAuthProvider):
             return AccessToken(token=token, client_id=MY_NUMBER, scopes=["*"], expires_at=None)
         return None
 
-# 3. Initialize MCP
-mcp = FastMCP("College Quiz MCP", auth=SimpleBearerAuth(TOKEN))
+# --- MCP Server ---
+mcp = FastMCP("College Quiz MCP Server", auth=SimpleBearerAuth(TOKEN))
 
-# 4. Persistent leaderboard (SQLite)
+# --- SQLite leaderboard ---
 conn = sqlite3.connect("leaderboard.db", check_same_thread=False)
 cur = conn.cursor()
 cur.execute("CREATE TABLE IF NOT EXISTS colleges(college TEXT PRIMARY KEY, total_score INTEGER)")
 for c in ("BITS", "P", "G/H"):
-    cur.execute("INSERT OR IGNORE INTO colleges VALUES(?,0)", (c,))
+    cur.execute("INSERT OR IGNORE INTO colleges VALUES(?, 0)", (c,))
 conn.commit()
 
-# 5. In-memory quiz state
+# --- In-memory quiz state ---
 active_quizzes: dict[str, dict] = {}
 
-# 6. validate tool (required by Puch AI)
+# --- Tool: validate (required by Puch) ---
 @mcp.tool
 async def validate() -> str:
     return MY_NUMBER
 
-# 7. Fetch dynamic questions from Open Trivia DB
+# --- Fetch dynamic questions from Open Trivia DB ---
 async def fetch_questions():
     questions = []
     async with httpx.AsyncClient() as client:
@@ -65,7 +70,7 @@ async def fetch_questions():
                 })
     return questions
 
-# 8. Public tool: single entry point
+# --- Tool: enter_competition ---
 @mcp.tool
 async def enter_competition(
     college: str | None = None,
@@ -103,8 +108,8 @@ async def enter_competition(
         session = active_quizzes[phone]
         idx = session["current"]
         qd = session["questions"][idx]
-        correct = (qd["choices"][answer - 1] == qd["ans"])
-        feedback = "Correct! +10 pts." if correct else f"Wrong. Answer was: {qd['ans']}"
+        correct = (qd["choices"][answer-1] == qd["ans"])
+        feedback = "✅ Correct! +10 pts." if correct else f"❌ Wrong. Answer was: {qd['ans']}"
         if correct:
             cur.execute(
                 "UPDATE colleges SET total_score = total_score + 10 WHERE college = ?",
@@ -120,7 +125,7 @@ async def enter_competition(
             del active_quizzes[phone]
             return (
                 f"{feedback}\n\n"
-                f"Quiz complete for {col}!\n\n"
+                f"🎉 Quiz complete for {col}!\n\n"
                 "🏁 Main Menu:\n"
                 "• Start Competition → @enter_competition college=<A|B|C>\n"
                 "• View Leaderboard → @show_leaderboard"
@@ -139,20 +144,19 @@ async def enter_competition(
     # Fallback
     return "Use @enter_competition to start or @show_leaderboard to view rankings."
 
-# 9. Public tool: leaderboard
+# --- Tool: show_leaderboard ---
 @mcp.tool
 async def show_leaderboard() -> str:
     rows = cur.execute(
-        "SELECT college,total_score FROM colleges ORDER BY total_score DESC"
+        "SELECT college, total_score FROM colleges ORDER BY total_score DESC"
     ).fetchall()
     lines = [f"{c}: {s}" for c, s in rows]
     return "🏆 Leaderboard 🏆\n" + "\n".join(lines)
 
-# ✅ Public health check (no auth required)
-@mcp.route("/")
-async def health():
-    return {"status": "ok", "message": "College Quiz MCP is running"}
+# --- Run MCP Server ---
+async def main():
+    print("🚀 Starting College Quiz MCP on http://0.0.0.0:8086")
+    await mcp.run_async("streamable-http", host="0.0.0.0", port=8086)
 
-# 10. Run the server
 if __name__ == "__main__":
-    asyncio.run(mcp.run_async("streamable-http", host="0.0.0.0", port=8086))
+    asyncio.run(main())
