@@ -1,23 +1,22 @@
-# server.py
 import os
 import random
 import sqlite3
 import asyncio
 from dotenv import load_dotenv
+from fastapi import FastAPI
 from fastmcp import FastMCP
 from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
-from fastmcp.server.tool import ToolContext            # <<--- ToolContext import
+from fastmcp.server.context import ToolContext
 from mcp.server.auth.provider import AccessToken
 import httpx
-import html
 
-# --- Load environment variables (trim whitespace) ---
+# --- Load environment variables ---
 load_dotenv()
-TOKEN = (os.getenv("AUTH_TOKEN") or "").strip()
-MY_NUMBER = (os.getenv("MY_NUMBER") or "").strip()
+TOKEN = os.getenv("AUTH_TOKEN")
+MY_NUMBER = os.getenv("MY_NUMBER")
 
-assert TOKEN, "Please set AUTH_TOKEN in .env or Railway variables"
-assert MY_NUMBER, "Please set MY_NUMBER in .env or Railway variables"
+assert TOKEN, "Please set AUTH_TOKEN in .env"
+assert MY_NUMBER, "Please set MY_NUMBER in .env"
 
 # --- Auth Provider ---
 class SimpleBearerAuth(BearerAuthProvider):
@@ -27,13 +26,16 @@ class SimpleBearerAuth(BearerAuthProvider):
         self.token = token
 
     async def load_access_token(self, token: str) -> AccessToken | None:
-        # token passed here is expected to be the raw bearer token
         if token == self.token:
             return AccessToken(token=token, client_id=MY_NUMBER, scopes=["*"], expires_at=None)
         return None
 
 # --- MCP Server ---
 mcp = FastMCP("College Quiz MCP Server", auth=SimpleBearerAuth(TOKEN))
+app = FastAPI()
+
+# Mount MCP routes
+app.mount("/mcp", mcp.app)
 
 # --- SQLite leaderboard ---
 conn = sqlite3.connect("leaderboard.db", check_same_thread=False)
@@ -46,11 +48,13 @@ conn.commit()
 # --- In-memory quiz state ---
 active_quizzes: dict[str, dict] = {}
 
-# --- MCP tools ---
+# --- Tool: validate ---
 @mcp.tool
-async def validate() -> str:
-    return MY_NUMBER
+async def validate(ctx: ToolContext) -> str:
+    """Returns the registered number for verification."""
+    return ctx.access_token.client_id if ctx.access_token else MY_NUMBER
 
+# --- Fetch dynamic questions from Open Trivia DB ---
 async def fetch_questions():
     questions = []
     async with httpx.AsyncClient() as client:
@@ -60,27 +64,23 @@ async def fetch_questions():
                 params={"amount": count, "difficulty": diff, "type": "multiple"},
                 timeout=10
             )
-            resp.raise_for_status()
             data = resp.json().get("results", [])
             for item in data:
-                # decode HTML entities from the trivia API
-                q = html.unescape(item["question"])
-                choices = [html.unescape(c) for c in item["incorrect_answers"] + [item["correct_answer"]]]
+                q = item["question"]
+                choices = item["incorrect_answers"] + [item["correct_answer"]]
                 random.shuffle(choices)
                 questions.append({
                     "diff": diff.capitalize(),
                     "q": q,
                     "choices": choices,
-                    "ans": html.unescape(item["correct_answer"])
+                    "ans": item["correct_answer"]
                 })
     return questions
 
-# NOTE: ToolContext is injected by FastMCP when the tool is called.
-# We accept `ctx: ToolContext` and read ctx.access_token.client_id (the caller ID).
+# --- Tool: enter_competition ---
 @mcp.tool
 async def enter_competition(ctx: ToolContext, college: str | None = None, answer: int | None = None) -> str:
-    # use context (not mcp.last_message)
-    phone = ctx.access_token.client_id
+    phone = ctx.access_token.client_id if ctx.access_token else "unknown"
 
     # Main menu
     if phone not in active_quizzes and college is None and answer is None:
@@ -112,16 +112,13 @@ async def enter_competition(ctx: ToolContext, college: str | None = None, answer
         session = active_quizzes[phone]
         idx = session["current"]
         qd = session["questions"][idx]
-
-        # validate answer index
-        if not (1 <= answer <= len(qd["choices"])):
-            return "Invalid answer number. Reply with a number corresponding to the options."
-
-        selected = qd["choices"][answer - 1]
-        correct = (selected == qd["ans"])
+        correct = (qd["choices"][answer-1] == qd["ans"])
         feedback = "✅ Correct! +10 pts." if correct else f"❌ Wrong. Answer was: {qd['ans']}"
         if correct:
-            cur.execute("UPDATE colleges SET total_score = total_score + 10 WHERE college = ?", (session["college"],))
+            cur.execute(
+                "UPDATE colleges SET total_score = total_score + 10 WHERE college = ?",
+                (session["college"],)
+            )
             conn.commit()
         session["current"] += 1
         idx = session["current"]
@@ -148,19 +145,34 @@ async def enter_competition(ctx: ToolContext, college: str | None = None, answer
             "Reply with @enter_competition answer=<number>"
         )
 
+    # Fallback
     return "Use @enter_competition to start or @show_leaderboard to view rankings."
 
+# --- Tool: show_leaderboard ---
 @mcp.tool
-async def show_leaderboard(ctx: ToolContext | None = None) -> str:
-    rows = cur.execute("SELECT college, total_score FROM colleges ORDER BY total_score DESC").fetchall()
+async def show_leaderboard() -> str:
+    rows = cur.execute(
+        "SELECT college, total_score FROM colleges ORDER BY total_score DESC"
+    ).fetchall()
     lines = [f"{c}: {s}" for c, s in rows]
     return "🏆 Leaderboard 🏆\n" + "\n".join(lines)
 
-# --- Run MCP Server ---
-async def main():
-    print("🚀 Starting College Quiz MCP on http://0.0.0.0:8086")
-    # This runs the internal HTTP transport (streamable-http). It is the same pattern as your working Job Finder code.
-    await mcp.run_async("streamable-http", host="0.0.0.0", port=8086)
+# --- Dummy /register endpoint ---
+@app.post("/register")
+async def register():
+    return {"access_token": TOKEN, "token_type": "bearer"}
 
+# --- Dummy OpenID discovery endpoints ---
+@app.get("/.well-known/oauth-authorization-server")
+async def oauth_server_info():
+    return {"issuer": "college-quiz-mcp", "jwks_uri": "https://example.com/jwks"}
+
+@app.get("/.well-known/openid-configuration")
+async def openid_config():
+    return {"issuer": "college-quiz-mcp", "jwks_uri": "https://example.com/jwks"}
+
+# --- Run everything ---
 if __name__ == "__main__":
-    asyncio.run(main())
+    import uvicorn
+    print("🚀 Starting College Quiz MCP on http://0.0.0.0:8086")
+    uvicorn.run(app, host="0.0.0.0", port=8086)
