@@ -1,9 +1,10 @@
 import os, random, sqlite3, asyncio
 from dotenv import load_dotenv
 from fastmcp import FastMCP
-from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
-from mcp.server.auth.provider import AccessToken
+from fastmcp.server.auth.providers.jwt import JWTVerifier, RSAKeyPair  # Updated import
+from fastmcp.server.auth import AccessToken  # Updated import
 import httpx
+from fastapi import FastAPI  # Added for health checks
 
 # 1. Load credentials
 load_dotenv()
@@ -11,8 +12,8 @@ TOKEN = os.getenv("AUTH_TOKEN")
 MY_NUMBER = os.getenv("MY_NUMBER")
 assert TOKEN and MY_NUMBER, "Set AUTH_TOKEN and MY_NUMBER in .env"
 
-# 2. Authentication Provider
-class SimpleBearerAuth(BearerAuthProvider):
+# 2. Updated Authentication Provider
+class SimpleBearerAuth(JWTVerifier):  # Changed from BearerAuthProvider
     def __init__(self, token: str):
         k = RSAKeyPair.generate()
         super().__init__(public_key=k.public_key, jwks_uri=None, issuer=None, audience=None)
@@ -22,8 +23,17 @@ class SimpleBearerAuth(BearerAuthProvider):
             return AccessToken(token=token, client_id=MY_NUMBER, scopes=["*"], expires_at=None)
         return None
 
-# 3. Initialize MCP
+# 3. Initialize FastAPI and MCP
+app = FastAPI()  # New FastAPI instance
 mcp = FastMCP("College Quiz MCP", auth=SimpleBearerAuth(TOKEN))
+
+# Health check endpoint
+@app.get("/")
+def health_check():
+    return {"status": "healthy", "service": "College Quiz MCP"}
+
+# Mount MCP under /mcp path
+app.mount("/mcp", mcp.app)
 
 # 4. Persistent leaderboard (SQLite)
 conn = sqlite3.connect("leaderboard.db", check_same_thread=False)
@@ -149,4 +159,4 @@ async def show_leaderboard() -> str:
 
 # 10. Run the server
 if __name__ == "__main__":
-    asyncio.run(mcp.run_async("streamable-http", host="0.0.0.0", port=8086))
+    asyncio.run(app.run_async(host="0.0.0.0", port=8086))  # Changed to run FastAPI app
