@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastmcp import FastMCP
 from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
-from fastmcp.server.context import ToolContext
 from mcp.server.auth.provider import AccessToken
 import httpx
 
@@ -33,8 +32,6 @@ class SimpleBearerAuth(BearerAuthProvider):
 # --- MCP Server ---
 mcp = FastMCP("College Quiz MCP Server", auth=SimpleBearerAuth(TOKEN))
 app = FastAPI()
-
-# Mount MCP routes
 app.mount("/mcp", mcp.app)
 
 # --- SQLite leaderboard ---
@@ -48,11 +45,20 @@ conn.commit()
 # --- In-memory quiz state ---
 active_quizzes: dict[str, dict] = {}
 
+def get_client_id_safe():
+    """Safely get client_id from last message without crashing after reconnects."""
+    try:
+        msg = mcp.last_message()
+        if msg and hasattr(msg, "access_token") and msg.access_token:
+            return msg.access_token.client_id
+    except Exception:
+        pass
+    return "unknown"
+
 # --- Tool: validate ---
 @mcp.tool
-async def validate(ctx: ToolContext) -> str:
-    """Returns the registered number for verification."""
-    return ctx.access_token.client_id if ctx.access_token else MY_NUMBER
+async def validate() -> str:
+    return get_client_id_safe()
 
 # --- Fetch dynamic questions from Open Trivia DB ---
 async def fetch_questions():
@@ -79,8 +85,8 @@ async def fetch_questions():
 
 # --- Tool: enter_competition ---
 @mcp.tool
-async def enter_competition(ctx: ToolContext, college: str | None = None, answer: int | None = None) -> str:
-    phone = ctx.access_token.client_id if ctx.access_token else "unknown"
+async def enter_competition(college: str | None = None, answer: int | None = None) -> str:
+    phone = get_client_id_safe()
 
     # Main menu
     if phone not in active_quizzes and college is None and answer is None:
