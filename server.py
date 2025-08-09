@@ -604,7 +604,7 @@ async def horoscope(
         "day": day.lower()
     }
     async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(url, headers=headers, data=data)
+            resp = await client.post(API_URL, headers=headers, data=data)
             resp.raise_for_status()
             return resp.json()
 
@@ -616,6 +616,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
