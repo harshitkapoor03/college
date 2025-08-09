@@ -7,45 +7,49 @@ from fastmcp import FastMCP
 from mcp.types import Field
 from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
 from mcp.server.auth.provider import AccessToken
+from fastmcp.server.types import Context  # ✅ Correct context import for session_id
 
 # --- DB Setup ---
 conn = sqlite3.connect("leaderboard.db", check_same_thread=False)
 cur = conn.cursor()
-cur.execute("""CREATE TABLE IF NOT EXISTS colleges (
+cur.execute("""
+CREATE TABLE IF NOT EXISTS colleges (
     college TEXT PRIMARY KEY,
     total_score INTEGER DEFAULT 0
-)""")
+)
+""")
 for c in ["BITS", "P", "G/H"]:
     cur.execute("INSERT OR IGNORE INTO colleges (college) VALUES (?)", (c,))
 conn.commit()
 
-# --- MCP Setup ---
+# --- MCP Config ---
 TOKEN = "730E024D"
-OWNER_PHONE = "917044607962"
+OWNER_PHONE = "917044607962"  # ✅ for Puch AI validate tool
 COLLEGE_MAP = {"A": "BITS", "B": "P", "C": "G/H"}
+active_quizzes = {}  # Stores per-session quiz state
 
-# --- Multi-session active quiz state ---
-active_quizzes = {}
-
+# --- Auth Provider ---
 class SimpleBearerAuthProvider(BearerAuthProvider):
     def __init__(self, token: str):
         k = RSAKeyPair.generate()
-        super().__init__(public_key=k.public_key, jwks_uri=None, issuer=None, audience=None)
+        super().__init__(public_key=k.public_key,
+                         jwks_uri=None,
+                         issuer=None,
+                         audience=None)
         self.token = token
 
     async def load_access_token(self, token: str) -> AccessToken | None:
         if token == self.token:
-            return AccessToken(
-                token=token,
-                client_id="client",
-                scopes=["*"],
-                expires_at=None,
-            )
+            return AccessToken(token=token,
+                               client_id="client",
+                               scopes=["*"],
+                               expires_at=None)
         return None
 
+# --- MCP Server ---
 mcp = FastMCP("College Quiz MCP Server", auth=SimpleBearerAuthProvider(TOKEN))
 
-# --- Fetch questions from Open Trivia DB API ---
+# --- Fetch Questions ---
 async def fetch_questions():
     questions = []
     try:
@@ -67,13 +71,14 @@ async def fetch_questions():
                         correct = item["correct_answer"].replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&")
                         random.shuffle(choices)
                         questions.append({
-                            "diff": diff.capitalize(), "q": q,
-                            "choices": choices, "ans": correct
+                            "diff": diff.capitalize(),
+                            "q": q,
+                            "choices": choices,
+                            "ans": correct
                         })
     except Exception as e:
         print(f"[ERROR] Error fetching trivia: {e}")
 
-    # Fallback hardcoded questions if API fails
     if len(questions) < 5:
         questions.extend([
             {"diff": "Easy", "q": "What is 2 + 2?", "choices": ["3", "4", "5", "6"], "ans": "4"},
@@ -84,16 +89,10 @@ async def fetch_questions():
         ][:5 - len(questions)])
     return questions[:5]
 
-# --- Utility: Session key (per MCP session) ---
-def get_session_id(context) -> str:
-    # Use MCP context/session id for isolation
-    # This works with FastMCP >= v2. If your FastMCP version uses another field, change as needed.
-    return getattr(context, "session_id", None) or getattr(context, "session", {}).get("id", None)
-
 # --- Tools ---
 @mcp.tool
 async def validate() -> str:
-    # Required for Puch AI: return phone number (country code + digits, no '+')
+    """Required by Puch AI to authenticate MCP server owner."""
     return OWNER_PHONE
 
 @mcp.tool
@@ -110,15 +109,9 @@ async def show_leaderboard() -> str:
     return header + "\n".join(lines)
 
 @mcp.tool
-async def start_quiz(
-    college: Annotated[str, Field(description="College choice: A, B, or C")]
-) -> str:
-    # Per-session quiz state
-    from fastmcp.context import Context  # Only needed if you want explicit context, otherwise MCP injects
-    import inspect
-    frame = inspect.currentframe()
-    context = frame.f_back.f_locals.get('context', None)
-    session_id = get_session_id(context)
+async def start_quiz(context: Context,
+                     college: Annotated[str, Field(description="College choice: A, B, or C")]) -> str:
+    session_id = context.session_id
     if not session_id:
         return "❌ Session context not found. Please reconnect."
 
@@ -131,7 +124,10 @@ async def start_quiz(
 
     questions = await fetch_questions()
     active_quizzes[session_id] = {
-        "college": selected_college, "questions": questions, "current": 0, "score": 0
+        "college": selected_college,
+        "questions": questions,
+        "current": 0,
+        "score": 0
     }
     qd = questions[0]
     opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(qd["choices"]))
@@ -142,20 +138,15 @@ async def start_quiz(
     )
 
 @mcp.tool
-async def answer_question(
-    answer: Annotated[int, Field(description="Answer number for current question")]
-) -> str:
-    import inspect
-    frame = inspect.currentframe()
-    context = frame.f_back.f_locals.get('context', None)
-    session_id = get_session_id(context)
+async def answer_question(context: Context,
+                          answer: Annotated[int, Field(description="Answer number for current question")]) -> str:
+    session_id = context.session_id
     session = active_quizzes.get(session_id)
     if not session:
         return "❌ No quiz in progress. Start one with @start_quiz college=<A|B|C>."
 
     idx = session["current"]
-    questions = session["questions"]
-    qd = questions[idx]
+    qd = session["questions"][idx]
 
     if not (1 <= answer <= len(qd["choices"])):
         return f"❌ Invalid choice! Pick 1–{len(qd['choices'])}."
@@ -163,16 +154,23 @@ async def answer_question(
     chosen = qd["choices"][answer - 1]
     is_correct = chosen == qd["ans"]
     feedback = "✅ Correct! +10 pts." if is_correct else f"❌ Wrong. Correct answer: {qd['ans']}"
+
     if is_correct:
         session["score"] += 10
 
     session["current"] += 1
 
     if session["current"] >= len(session["questions"]):
-        # Quiz finished: update DB, clear state, show summary
-        cur.execute("UPDATE colleges SET total_score = total_score + ? WHERE college = ?", (session["score"], session["college"]))
+        # Quiz finished
+        cur.execute(
+            "UPDATE colleges SET total_score = total_score + ? WHERE college = ?",
+            (session["score"], session["college"])
+        )
         conn.commit()
-        total_score = cur.execute("SELECT total_score FROM colleges WHERE college = ?", (session["college"],)).fetchone()[0]
+        total_score = cur.execute(
+            "SELECT total_score FROM colleges WHERE college = ?",
+            (session["college"],)
+        ).fetchone()[0]
         del active_quizzes[session_id]
         return (
             f"{feedback}\n\n"
@@ -181,17 +179,17 @@ async def answer_question(
             "To play again: @start_quiz college=<A|B|C>\n"
             "Or view rankings: @show_leaderboard"
         )
-    else:
-        # Next question
-        next_qd = questions[session["current"]]
-        opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(next_qd["choices"]))
-        return (
-            f"{feedback}\n"
-            f"Q{session['current']+1} ({next_qd['diff']}): {next_qd['q']}\n{opts}\n"
-            "Reply with @answer_question answer=<number>"
-        )
 
-# Entry point
+    # Next question
+    next_q = session["questions"][session["current"]]
+    opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(next_q["choices"]))
+    return (
+        f"{feedback}\n"
+        f"Q{session['current'] + 1} ({next_q['diff']}): {next_q['q']}\n{opts}\n"
+        "Reply with @answer_question answer=<number>"
+    )
+
+# --- Run server ---
 async def main():
     print("🚀 Starting MCP server on http://0.0.0.0:8086")
     await mcp.run_async("streamable-http", host="0.0.0.0", port=8086)
