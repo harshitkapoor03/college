@@ -389,22 +389,22 @@ async def vintage_photo_filter(
     except Exception as e:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 #----------------------------------------------------------------tool horoscope#
-# import os
-# import re
-# import io
-# import base64
-# import random
-# import sqlite3
-# import asyncio
-# from typing import Annotated
-# import httpx
+import os
+import re
+import io
+import base64
+import random
+import sqlite3
+import asyncio
+from typing import Annotated
+import httpx
 
-# # FastMCP + auth
-# from fastmcp import FastMCP
-# from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
-# from mcp.server.auth.provider import AccessToken
-# from mcp import ErrorData, McpError
-# from mcp.types import Field, TextContent, ImageContent, INTERNAL_ERROR
+# FastMCP + auth
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
+from mcp.server.auth.provider import AccessToken
+from mcp import ErrorData, McpError
+from mcp.types import Field, TextContent, ImageContent, INTERNAL_ERROR
 # # VALID_SIGNS = {
 # #     "aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces"
 # # }
@@ -443,36 +443,36 @@ async def vintage_photo_filter(
 # from mcp import McpError, ErrorData, INTERNAL_ERROR
 # from mcp.types import Field
 
-# VALID_SIGNS = {
-#     "aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces"
-# }
+VALID_SIGNS = {
+    "aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces"
+}
 
-# @mcp.tool(description="Get daily horoscope. Usage: @horoscope sign=<aries>")
-# async def horoscope(
-#     sign: Annotated[str, Field(description="Zodiac sign e.g. aries")] = None,
-# ) -> str:
-#     if not sign:
-#         raise McpError(ErrorData(code=INTERNAL_ERROR, message="Please provide a zodiac sign (e.g. aries)."))
-#     sign_l = sign.strip().lower()
-#     if sign_l not in VALID_SIGNS:
-#         return f"❌ Unknown sign '{sign}'. Valid: {', '.join(sorted(VALID_SIGNS))}"
+@mcp.tool(description="Get daily horoscope. Usage: @horoscope sign=<aries>")
+async def horoscope(
+    sign: Annotated[str, Field(description="Zodiac sign e.g. aries")] = None,
+) -> str:
+    if not sign:
+        raise McpError(ErrorData(code=INTERNAL_ERROR, message="Please provide a zodiac sign (e.g. aries)."))
+    sign_l = sign.strip().lower()
+    if sign_l not in VALID_SIGNS:
+        return f"❌ Unknown sign '{sign}'. Valid: {', '.join(sorted(VALID_SIGNS))}"
 
-#     url = f"https://horoscope-api.herokuapp.com/horoscope/today/{sign_l}"
-#     try:
-#         async with httpx.AsyncClient() as client:
-#             resp = await client.get(url, timeout=10)
-#             resp.raise_for_status()
-#             data = resp.json()
-#     except Exception as e:
-#         raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Horoscope fetch failed: {e}"))
+    url = f"https://horoscope-api.herokuapp.com/horoscope/today/{sign_l}"
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as e:
+        raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Horoscope fetch failed: {e}"))
 
-#     description = data.get("horoscope", "(no description)")
-#     date_range = data.get("date_range", "")
-#     current_date = data.get("current_date", "") or ""
+    description = data.get("horoscope", "(no description)")
+    date_range = data.get("date_range", "")
+    current_date = data.get("current_date", "") or ""
 
-#     return (f"🔮 Horoscope — {sign_l.capitalize()} — {current_date}\n"
-#             f"Date Range: {date_range}\n\n"
-#             f"{description}")
+    return (f"🔮 Horoscope — {sign_l.capitalize()} — {current_date}\n"
+            f"Date Range: {date_range}\n\n"
+            f"{description}")
 
 
 # --- Run server ---
@@ -482,6 +482,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
