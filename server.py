@@ -512,56 +512,56 @@ async def vintage_photo_filter(
 #             f"{desc}\n\n"
 #             f"• Mood: {mood}\n• Color: {color}\n• Lucky number: {lucky_num}\n• Lucky time: {lucky_time}")
 
-import asyncio
-import sqlite3
-import httpx
-from fastmcp import FastMCP
-from mcp.types import Field
+# import asyncio
+# import sqlite3
+# import httpx
+# from fastmcp import FastMCP
+# from mcp.types import Field
 
-# mcp = FastMCP()
+# # mcp = FastMCP()
 
-# --- DB Setup ---
-astro_conn = sqlite3.connect("horoscope.db")
-curs = astro_conn.cursor()
-curs.execute("""
-CREATE TABLE IF NOT EXISTS history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sign TEXT,
-    day TEXT,
-    prediction TEXT
-)
-""")
-astro_conn.commit()
+# # --- DB Setup ---
+# astro_conn = sqlite3.connect("horoscope.db")
+# curs = astro_conn.cursor()
+# curs.execute("""
+# CREATE TABLE IF NOT EXISTS history (
+#     id INTEGER PRIMARY KEY AUTOINCREMENT,
+#     sign TEXT,
+#     day TEXT,
+#     prediction TEXT
+# )
+# """)
+# astro_conn.commit()
 
-API_URL = "https://aztro.sameerkumar.website"
+# API_URL = "https://aztro.sameerkumar.website"
 
-@mcp.tool()
-async def horoscope(
-    sign: Annotated[str, Field(description="Zodiac sign (e.g., 'aries', 'leo')")],
-    day: Annotated[str, Field(description="'today', 'tomorrow', or 'yesterday'")]
-) -> str:
-    """
-    Get daily horoscope for a given sign and day from Aztro API.
-    """
-    # try:
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.post(
-            API_URL,
-            params={"sign": sign, "day": day}  # Aztro takes params in POST
-        )
-        resp.raise_for_status()
-        data = resp.json()
+# @mcp.tool()
+# async def horoscope(
+#     sign: Annotated[str, Field(description="Zodiac sign (e.g., 'aries', 'leo')")],
+#     day: Annotated[str, Field(description="'today', 'tomorrow', or 'yesterday'")]
+# ) -> str:
+#     """
+#     Get daily horoscope for a given sign and day from Aztro API.
+#     """
+#     # try:
+#     async with httpx.AsyncClient(timeout=10.0) as client:
+#         resp = await client.post(
+#             API_URL,
+#             params={"sign": sign, "day": day}  # Aztro takes params in POST
+#         )
+#         resp.raise_for_status()
+#         data = resp.json()
 
-    prediction = data.get("description", "No prediction available.")
+#     prediction = data.get("description", "No prediction available.")
 
-    # Save to DB
-    curs.execute(
-        "INSERT INTO history (sign, day, prediction) VALUES (?, ?, ?)",
-        (sign, day, prediction)
-    )
-    astro_conn.commit()
+#     # Save to DB
+#     curs.execute(
+#         "INSERT INTO history (sign, day, prediction) VALUES (?, ?, ?)",
+#         (sign, day, prediction)
+#     )
+#     astro_conn.commit()
 
-    return f"Horoscope for {sign} ({day}): {prediction}"
+#     return f"Horoscope for {sign} ({day}): {prediction}"
 
     # except httpx.RequestError as e:
     #     return f"Error connecting to Aztro API: {e}"
@@ -570,6 +570,30 @@ async def horoscope(
     # except Exception as e:
     #     return f"Unexpected error: {e}"
 
+API_URL = "https://sameer-kumar-aztro-v1.p.rapidapi.com/"
+API_KEY = "7bd7d59100msha77016cf106a0aap196edejsnabf8fbb51149"  # Replace with your real RapidAPI key
+
+@mcp.tool()
+async def horoscope(description="Get daily horoscope")
+    sign: Annotated[str, Field(description="Zodiac sign (e.g., 'aries', 'leo')")],
+    day: Annotated[str, Field(description="'today', 'tomorrow', or 'yesterday'")] = "today"
+) -> str:
+    """
+    Get daily horoscope for a given sign and day from the Aztro API via RapidAPI.
+    """
+    headers = {
+        "x-rapidapi-key": API_KEY,
+        "x-rapidapi-host": "sameer-kumar-aztro-v1.p.rapidapi.com",
+        "Content-Type": "application/json"
+    }
+    params = {"sign": sign, "day": day}
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(API_URL, headers=headers, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+
+    return data.get("description", "No prediction available.")
 
 
 # --- Run server ---
@@ -579,6 +603,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
