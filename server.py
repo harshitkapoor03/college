@@ -609,26 +609,40 @@ async def vintage_photo_filter(
 #             return resp.json()
 @mcp.tool(description="Get daily horoscope")
 async def horoscope(
-    sign: Annotated[str, Field(description="Zodiac sign, e.g., aries, taurus, gemini")],
-    day: Annotated[str, Field(description="'today', 'tomorrow', or 'yesterday'")] = "today"
-) -> dict:
+    sign: Annotated[str, Field(description="Zodiac sign (e.g., 'aries', 'leo')")],
+    lang: Annotated[str, Field(description="Language code (e.g., 'en')")] = "en",
+    type_: Annotated[str, Field(description="Horoscope type (e.g., 'daily')")] = "daily",
+    timezone: Annotated[str, Field(description="Timezone (e.g., 'UTC')")] = "UTC"
+) -> str:
     """
-    Get daily horoscope for a given sign and day from the official Aztro API.
+    Get daily horoscope for a given sign from the Astropredict API via RapidAPI.
     """
+    import httpx
+    import os
 
-    url = "https://aztro.sameerkumar.website/"
+    API_KEY = os.getenv("RAPIDAPI_KEY")  # store key in environment variables
+    API_URL = "https://astropredict-daily-horoscopes-lucky-insights.p.rapidapi.com/horoscope"
 
+    headers = {
+        "x-rapidapi-key": API_KEY,
+        "x-rapidapi-host": "astropredict-daily-horoscopes-lucky-insights.p.rapidapi.com"
+    }
     params = {
-        "sign": sign.lower(),
-        "day": day.lower()
+        "lang": lang,
+        "zodiac": sign.lower(),
+        "type": type_,
+        "timezone": timezone
     }
 
-    
-    async with httpx.AsyncClient(timeout=10) as client:
-        # Official Aztro API requires POST, but params go in the query string
-        resp = await client.post(url, params=params)
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(API_URL, headers=headers, params=params)
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+
+    # The API returns multiple fields — adjust as needed
+    # Assuming the main horoscope text is in "prediction" or similar
+    return data.get("prediction", "No prediction available.")
+
 
 
 # --- Run server ---
@@ -638,6 +652,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
