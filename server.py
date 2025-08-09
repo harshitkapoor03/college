@@ -570,8 +570,6 @@ async def horoscope(
     except Exception as e:
         return f"Unexpected error: {e}"
 
-if __name__ == "__main__":
-    mcp.run()
 
 
 # --- Run server ---
@@ -581,6 +579,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
