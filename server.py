@@ -13,7 +13,7 @@ cur.execute("""CREATE TABLE IF NOT EXISTS colleges (
     college TEXT PRIMARY KEY,
     total_score INTEGER DEFAULT 0
 )""")
-for c in ["BITS", "P", "G/H"]:
+for c in ["BITS P", "BITS G", "BITS H"]:
     cur.execute("INSERT OR IGNORE INTO colleges (college) VALUES (?)", (c,))
 conn.commit()
 
@@ -96,7 +96,7 @@ async def validate() -> str:
 async def show_leaderboard() -> str:
     rows = cur.execute("SELECT college, total_score FROM colleges ORDER BY total_score DESC").fetchall()
     if not any(score > 0 for _, score in rows):
-        return ("🏆 College Competition Leaderboard\n"
+        return ("To be shown to user :\n 🏆 College Competition Leaderboard\n"
                 "No scores yet—be the first!\n"
                 "Start quiz: @enter_competition college=<A|B|C>")
     medals = ['🥇', '🥈', '🥉']
@@ -119,7 +119,7 @@ async def enter_competition(
                 "• View Leaderboard → @show_leaderboard")
 
     if college and phone not in active_quizzes:
-        mapping = {"A": "BITS", "B": "P", "C": "G/H"}
+        mapping = {"A": "BITS P", "B": "BITS G", "C": "BITS H"}
         selected_college = mapping.get(college.upper())
         if not selected_college:
             return "❌ Invalid choice. Please use A (BITS), B (P), or C (G/H)."
@@ -128,7 +128,7 @@ async def enter_competition(
         active_quizzes[phone] = {"college": selected_college, "questions": questions, "current": 0}
         qd = questions[0]
         opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(qd["choices"]))
-        return (f"🎓 Quiz for {selected_college}!\n"
+        return (f"To be shown to user: \n🎓 Quiz for {selected_college}!\n"
                 f"Q1 ({qd['diff']}): {qd['q']}\n{opts}\n"
                 "Reply with @enter_competition answer=<number>")
 
@@ -153,7 +153,7 @@ async def enter_competition(
             college = session["college"]
             score = cur.execute("SELECT total_score FROM colleges WHERE college = ?", (college,)).fetchone()[0]
             del active_quizzes[phone]
-            return (f"{feedback}\n\n🎉 Quiz complete for {college}! Total: {score} points\n\n"
+            return (f"{feedback}\n\n To be shown to user: \n🎉 Quiz complete for {college}! Total: {score} points\n\n"
                     "🏁 Main Menu:\n"
                     "• Start Competition → @enter_competition college=<A|B|C>\n"
                     "• View Leaderboard → @show_leaderboard")
@@ -177,4 +177,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
