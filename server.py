@@ -176,74 +176,53 @@ async def enter_competition(
                 "Reply with @enter_competition answer=<number>")
 
     return "Use @enter_competition college=<BITS P|BITS G|BITS H> to start or @show_leaderboard for rankings."
-import asyncio
-from typing import Annotated
-import os
-from dotenv import load_dotenv
-from fastmcp import FastMCP
-from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
-from mcp import ErrorData, McpError
-from mcp.server.auth.provider import AccessToken
-from mcp.types import TextContent, ImageContent, INVALID_PARAMS, INTERNAL_ERROR
-from pydantic import BaseModel, Field, AnyUrl
-
-
-# Extended imports allowed through MCP Image type and numpy usage in httpx environment
 import numpy as np
-from PIL import Image, ImageEnhance
+from PIL import Image as PilImage, ImageEnhance
+from typing import Annotated
+from fastmcp import FastMCP
+from fastmcp.types.images import Image
+from mcp.types import Field
 
-# Define the iPhone 3GS effect filter function
-def apply_iphone3gs_effect_pil(img: Image.Image) -> Image.Image:
-    # 1. Downscale and upscale to simulate low resolution
+# Define effect function using PIL.Image internally
+def apply_iphone3gs_effect_pil(img: PilImage.Image) -> PilImage.Image:
     w, h = img.size
-    small = img.resize((w // 2, h // 2), Image.LANCZOS)
-    img_lr = small.resize((w, h), Image.NEAREST)
+    small = img.resize((w // 2, h // 2), PilImage.LANCZOS)
+    img_lr = small.resize((w, h), PilImage.NEAREST)
 
-    # 2. Muted saturation and contrast
-    # Convert to HSV
     hsv = img_lr.convert('HSV')
     h_s, s_s, v_s = hsv.split()
-    # Reduce saturation
     s_s = ImageEnhance.Brightness(s_s).enhance(0.67)
-    # Slightly darken value
-    v_s = ImageEnhance.Brightness(v_s).enhance(1.0)  # can reduce below 1 if desired
-    hsv = Image.merge('HSV', (h_s, s_s, v_s))
+    v_s = ImageEnhance.Brightness(v_s).enhance(1.0)
+    hsv = PilImage.merge('HSV', (h_s, s_s, v_s))
     img_color = hsv.convert('RGB')
 
-    # 3. Add organic-style noise
     np_img = np.array(img_color).astype(np.int16)
     noise = np.random.normal(0, 25, np_img.shape).astype(np.int16)
     np_noisy = np.clip(np_img + noise, 0, 255).astype(np.uint8)
-    img_noisy = Image.fromarray(np_noisy)
+    img_noisy = PilImage.fromarray(np_noisy)
 
-    # 4. Vignette effect
-    # Create vignette mask
     x = np.linspace(-1, 1, w)
     y = np.linspace(-1, 1, h)
     X, Y = np.meshgrid(x, y)
     radius = np.sqrt(X**2 + Y**2)
     mask = np.clip(1 - radius, 0, 1)
     mask = (mask * 255).astype(np.uint8)
-    vignette = Image.fromarray(mask).resize((w, h))
-    # Convert mask to 3 channels
-    vignette_rgb = Image.merge('RGB', (vignette, vignette, vignette))
-    # Apply the vignette as a blend
-    img_vignette = Image.composite(img_noisy, Image.new('RGB', img_noisy.size, 'black'), vignette_rgb)
+    vignette = PilImage.fromarray(mask).resize((w, h))
+    vignette_rgb = PilImage.merge('RGB', (vignette, vignette, vignette))
+    img_vignette = PilImage.composite(img_noisy, PilImage.new('RGB', img_noisy.size, 'black'), vignette_rgb)
 
     return img_vignette
 
-@mcp.tool(description="Apply iPhone 3GS camera effect to the input photo without using OpenCV.")
-async def iphone_3gs(
-    photo: Annotated['Image', Field(description="Input photo to transform")]
-) -> 'Image':
-    # Convert MCP Image to Pillow Image
+# MCP server setup
+mcp = FastMCP("iPhone 3GS Effect Server")
+
+# MCP tool to apply effect to the MCP Image type
+@mcp.tool(description="Apply iPhone 3GS camera effect to the input photo.")
+async def iphone_3gs(photo: Annotated[Image, Field(description="Input photo to transform")]) -> Image:
     pil_img = photo.to_pil()
-
-    # Apply the effect
     filtered_img = apply_iphone3gs_effect_pil(pil_img)
+    return Image.from_pil(filtered_img)
 
-    # Convert back to MCP Image and return
-    return photo.from_pil(filtered_img)
 
 
 # --- Run server ---
@@ -253,6 +232,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
