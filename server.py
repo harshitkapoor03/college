@@ -226,6 +226,86 @@ async def enter_competition(
 
 #     except Exception as e:
 #         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
+#original kodak from here from typing import Annotated
+# from mcp.types import TextContent, ImageContent, INTERNAL_ERROR
+# from mcp import ErrorData, McpError
+# from pydantic import Field
+
+# @mcp.tool(description="Apply Kodak + iPhone 3GS vintage-style filter to an input photo.")
+# async def vintage_photo_filter(
+#     puch_image_data: Annotated[str, Field(description="Base64-encoded image data to transform")] = None,
+# ) -> list[TextContent | ImageContent]:
+#     import base64
+#     import io
+#     from PIL import Image, ImageEnhance, ImageFilter
+#     import numpy as np
+
+#     try:
+#         # Decode base64 input
+#         image_bytes = base64.b64decode(puch_image_data)
+#         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+#         w, h = image.size
+
+#         # -----------------
+#         # Step 1: Kodak-style warm tint
+#         # -----------------
+#         r, g, b = image.split()
+#         r = r.point(lambda i: i * 1.02)
+#         g = g.point(lambda i: i * 1.01)
+#         b = b.point(lambda i: i * 0.95)
+#         image = Image.merge("RGB", (r, g, b))
+
+#         # -----------------
+#         # Step 2: Slight Gaussian blur
+#         # -----------------
+#         image = image.filter(ImageFilter.GaussianBlur(radius=1.3))
+
+#         # -----------------
+#         # Step 3: Add film grain
+#         # -----------------
+#         img_np = np.array(image).astype(np.int16)
+#         noise = np.random.normal(0, 10, img_np.shape).astype(np.int16)
+#         img_np = np.clip(img_np + noise, 0, 255).astype(np.uint8)
+#         image = Image.fromarray(img_np)
+
+#         # -----------------
+#         # Step 4: Low-res simulation (iPhone 3GS style)
+#         # -----------------
+#         lowres_size = (w // 2, h // 2)
+#         image_small = image.resize(lowres_size, Image.BILINEAR)
+#         image = image_small.resize((w, h), Image.NEAREST)
+
+#         # -----------------
+#         # Step 5: Reduce saturation
+#         # -----------------
+#         enhancer = ImageEnhance.Color(image)
+#         image = enhancer.enhance(0.67)  # ~67% saturation
+
+#         # -----------------
+#         # Step 6: Add vignette effect
+#         # -----------------
+#         img_np = np.array(image).astype(np.float32)
+#         y, x = np.ogrid[:h, :w]
+#         center_x, center_y = w / 2, h / 2
+#         sigma_x, sigma_y = w / 2, h / 2
+#         mask = np.exp(-((x - center_x) ** 2 / (2 * sigma_x ** 2) +
+#                         (y - center_y) ** 2 / (2 * sigma_y ** 2)))
+#         mask = (mask / mask.max())  # normalize
+#         for i in range(3):
+#             img_np[:, :, i] *= mask
+#         image = Image.fromarray(np.clip(img_np, 0, 255).astype(np.uint8))
+
+#         # -----------------
+#         # Step 7: Encode output as base64 PNG
+#         # -----------------
+#         buf = io.BytesIO()
+#         image.save(buf, format="PNG")
+#         encoded_img = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+#         return [ImageContent(type="image", mimeType="image/png", data=encoded_img)]
+
+#     except Exception as e:
+#         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 from typing import Annotated
 from mcp.types import TextContent, ImageContent, INTERNAL_ERROR
 from mcp import ErrorData, McpError
@@ -246,58 +326,60 @@ async def vintage_photo_filter(
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         w, h = image.size
 
-        # -----------------
         # Step 1: Kodak-style warm tint
-        # -----------------
         r, g, b = image.split()
         r = r.point(lambda i: i * 1.02)
         g = g.point(lambda i: i * 1.01)
         b = b.point(lambda i: i * 0.95)
         image = Image.merge("RGB", (r, g, b))
 
-        # -----------------
         # Step 2: Slight Gaussian blur
-        # -----------------
         image = image.filter(ImageFilter.GaussianBlur(radius=1.3))
 
-        # -----------------
         # Step 3: Add film grain
-        # -----------------
         img_np = np.array(image).astype(np.int16)
-        noise = np.random.normal(0, 10, img_np.shape).astype(np.int16)
+        noise = np.random.normal(0, 17, img_np.shape).astype(np.int16)
         img_np = np.clip(img_np + noise, 0, 255).astype(np.uint8)
         image = Image.fromarray(img_np)
 
-        # -----------------
-        # Step 4: Low-res simulation (iPhone 3GS style)
-        # -----------------
-        lowres_size = (w // 2, h // 2)
+        # Step 4: Low-res simulation
+        yu = max(w, h)
+        if yu > 4000:
+            yi = 2
+        elif yu > 3000:
+            yi = 1.5
+        elif yu > 2000:
+            yi = 1
+        elif yu > 1100:
+            yi = 0.5
+        else:
+            yi = -0.15
+
+        lowres_size = (int(w // (1.4 + yi)), int(h // (1.4 + yi)))
         image_small = image.resize(lowres_size, Image.BILINEAR)
         image = image_small.resize((w, h), Image.NEAREST)
 
-        # -----------------
         # Step 5: Reduce saturation
-        # -----------------
         enhancer = ImageEnhance.Color(image)
-        image = enhancer.enhance(0.67)  # ~67% saturation
+        image = enhancer.enhance(0.71)
 
-        # -----------------
         # Step 6: Add vignette effect
-        # -----------------
         img_np = np.array(image).astype(np.float32)
         y, x = np.ogrid[:h, :w]
         center_x, center_y = w / 2, h / 2
         sigma_x, sigma_y = w / 2, h / 2
         mask = np.exp(-((x - center_x) ** 2 / (2 * sigma_x ** 2) +
                         (y - center_y) ** 2 / (2 * sigma_y ** 2)))
-        mask = (mask / mask.max())  # normalize
+        mask = mask / mask.max()
         for i in range(3):
             img_np[:, :, i] *= mask
         image = Image.fromarray(np.clip(img_np, 0, 255).astype(np.uint8))
 
-        # -----------------
-        # Step 7: Encode output as base64 PNG
-        # -----------------
+        # Step 7: Increase brightness slightly
+        brightness_enhancer = ImageEnhance.Brightness(image)
+        image = brightness_enhancer.enhance(1.1)
+
+        # Step 8: Encode output as base64 PNG
         buf = io.BytesIO()
         image.save(buf, format="PNG")
         encoded_img = base64.b64encode(buf.getvalue()).decode("utf-8")
@@ -307,6 +389,7 @@ async def vintage_photo_filter(
     except Exception as e:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
+
 # --- Run server ---
 async def main():
     print("🚀 Starting MCP server on http://0.0.0.0:8086")
@@ -314,6 +397,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
