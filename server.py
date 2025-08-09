@@ -88,7 +88,9 @@ class SimpleBearerAuthProvider(BearerAuthProvider):
 mcp = FastMCP("College Quiz MCP Server", auth=SimpleBearerAuthProvider(TOKEN))
 
 # --- Tools ---
-
+@mcp.tool
+async def validate() -> str:
+    return MY_NUMBER
 @mcp.tool
 async def show_leaderboard() -> str:
     rows = cur.execute("SELECT college, total_score FROM colleges ORDER BY total_score DESC").fetchall()
