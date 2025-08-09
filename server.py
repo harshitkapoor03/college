@@ -573,8 +573,8 @@ async def vintage_photo_filter(
 API_URL = "https://sameer-kumar-aztro-v1.p.rapidapi.com/"
 API_KEY = "7bd7d59100msha77016cf106a0aap196edejsnabf8fbb51149"  # Replace with your real RapidAPI key
 
-@mcp.tool()
-async def horoscope(description="Get daily horoscope")
+@mcp.tool(description="Get daily horoscope")
+async def horoscope(
     sign: Annotated[str, Field(description="Zodiac sign (e.g., 'aries', 'leo')")],
     day: Annotated[str, Field(description="'today', 'tomorrow', or 'yesterday'")] = "today"
 ) -> str:
@@ -603,6 +603,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
