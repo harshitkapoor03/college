@@ -405,9 +405,9 @@ from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
 from mcp.server.auth.provider import AccessToken
 from mcp import ErrorData, McpError
 from mcp.types import Field, TextContent, ImageContent, INTERNAL_ERROR
-# VALID_SIGNS = {
-#     "aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces"
-# }
+VALID_SIGNS = {
+    "aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces"
+}
 
 # @mcp.tool(description="Get daily horoscope. Usage: @horoscope sign=<aries> day=<today|yesterday|tomorrow>")
 # async def horoscope(
@@ -521,6 +521,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
