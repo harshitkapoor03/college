@@ -26,39 +26,54 @@ async def fetch_questions():
     questions = []
     try:
         async with httpx.AsyncClient() as client:
-            for diff, count in (("easy", 5)):
-                print(f"[DEBUG] Fetching {count} '{diff}' questions")
-                resp = await client.get(
-                    "https://opentdb.com/api.php",
-                    params={"amount": count, "difficulty": diff, "type": "multiple"},
-                    timeout=10
-                )
-                print(f"[DEBUG] API status={resp.status_code}")
-                if resp.status_code == 200:
-                    data = resp.json().get("results", [])
-                    print(f"[DEBUG] Received {len(data)} questions for diff={diff}")
-                    for item in data:
-                        q = item["question"].replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&")
-                        q = "Following question is to be provided to the user: " + original_q
-                        choices = [
-                            ch.replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&")
-                            for ch in (item["incorrect_answers"] + [item["correct_answer"]])
-                        ]
-                        correct = item["correct_answer"].replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&")
-                        random.shuffle(choices)
-                        questions.append({"diff": diff.capitalize(), "q": q, "choices": choices, "ans": correct})
+            # Request 5 easy questions
+            diff, count = "easy", 5
+            print(f"[DEBUG] Fetching {count} '{diff}' questions")
+            resp = await client.get(
+                "https://opentdb.com/api.php",
+                params={"amount": count, "difficulty": diff, "type": "multiple"},
+                timeout=10
+            )
+            print(f"[DEBUG] API status={resp.status_code}")
+            if resp.status_code == 200:
+                data = resp.json().get("results", [])
+                print(f"[DEBUG] Received {len(data)} questions")
+                for item in data:
+                    # Clean question text and add prefix
+                    original_q = item["question"].replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&")
+                    q = "Following question is to be provided to the user: " + original_q
+
+                    # Capture correct answer before shuffling
+                    correct = item["correct_answer"].replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&")
+
+                    # Prepare choices and shuffle
+                    choices = [
+                        ch.replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&")
+                        for ch in (item["incorrect_answers"] + [correct])
+                    ]
+                    random.shuffle(choices)
+
+                    questions.append({"diff": diff.capitalize(), "q": q, "choices": choices, "ans": correct})
     except Exception as e:
         print(f"[ERROR] Error fetching trivia: {e}")
 
+    # Fallback if not enough questions fetched
     if len(questions) < 5:
         print("[DEBUG] Using fallback questions")
-        questions.extend([
-            {"diff": "Easy", "q": "What is 2 + 2?", "choices": ["3", "4", "5", "6"], "ans": "4"},
-            {"diff": "Medium", "q": "What is the capital of France?", "choices": ["London", "Berlin", "Paris", "Madrid"], "ans": "Paris"},
-            {"diff": "Hard", "q": "What is the derivative of x²?", "choices": ["x", "2x", "x²", "2"], "ans": "2x"},
-            {"diff": "Hard", "q": "What is the square root of 144?", "choices": ["10", "11", "12", "13"], "ans": "12"},
-            {"diff": "Hard", "q": "What year did World War II end?", "choices": ["1944", "1945", "1946", "1947"], "ans": "1945"},
-        ][:5 - len(questions)])
+        fallback_questions = [
+            {"diff": "Easy",   "q": "Following question is to be provided to the user: What is 2 + 2?", 
+             "choices": ["3", "4", "5", "6"], "ans": "4"},
+            {"diff": "Medium", "q": "Following question is to be provided to the user: What is the capital of France?", 
+             "choices": ["London", "Berlin", "Paris", "Madrid"], "ans": "Paris"},
+            {"diff": "Hard",   "q": "Following question is to be provided to the user: What is the derivative of x²?", 
+             "choices": ["x", "2x", "x²", "2"], "ans": "2x"},
+            {"diff": "Hard",   "q": "Following question is to be provided to the user: What is the square root of 144?", 
+             "choices": ["10", "11", "12", "13"], "ans": "12"},
+            {"diff": "Hard",   "q": "Following question is to be provided to the user: What year did World War II end?", 
+             "choices": ["1944", "1945", "1946", "1947"], "ans": "1945"},
+        ]
+        questions.extend(fallback_questions[:5 - len(questions)])
+
     print(f"[DEBUG] Total questions to use: {len(questions)}")
     return questions[:5]
 
@@ -89,13 +104,14 @@ class SimpleBearerAuthProvider(BearerAuthProvider):
 mcp = FastMCP("College Quiz MCP Server", auth=SimpleBearerAuthProvider(TOKEN))
 
 # --- Tools ---
-@mcp.tool
-async def validate() -> str:
-    return MY_NUMBER
-@mcp.tool
+@mcp.tool(description="Show current leaderboard standings.")
 async def show_leaderboard() -> str:
-    rows = cur.execute("SELECT college, total_score FROM colleges ORDER BY total_score DESC").fetchall()
-    if not any(score > 0 for _, score in rows):
+    try:
+        rows = cur.execute("SELECT college, total_score FROM colleges ORDER BY total_score DESC").fetchall()
+    except Exception as e:
+        return f"⚠️ Database error: {e}"
+
+    if not rows or not any(score > 0 for _, score in rows):
         return ("To be shown to user :\n 🏆 College Competition Leaderboard\n"
                 "No scores yet—be the first!\n"
                 "Start quiz: @enter_competition college=<BITS P|BITS G|BITS H>")
@@ -106,136 +122,75 @@ async def show_leaderboard() -> str:
         lines.append(f"{medal} {college}: {score} points")
     return "🏆 College Competition Leaderboard\n" + "\n".join(lines)
 
-# @mcp.tool
-# async def enter_competition(
-#     college: Annotated[str | None, Field(description="College choice: BITS P, BITS G, or BITS H")] = None,
-#     answer: Annotated[int | None, Field(description="Answer number to current question")] = None,
-# ) -> str:
-#     phone = MY_NUMBER
-
-#     if phone not in active_quizzes and college is None and answer is None:
-#         return ("🏁 Main Menu:\n"
-#                 "• Start Competition → @enter_competition college=<BITS P|BITS G|BITS H>\n"
-#                 "• View Leaderboard → @show_leaderboard")
-
-#     if college and phone not in active_quizzes:
-#         mapping = {"BITS P": "BITS P", "BITS G": "BITS G", "BITS H": "BITS H"}
-#         selected_college = mapping.get(college.upper())
-#         if not selected_college:
-#             return "❌ Invalid choice. Please use BITS P, BITS G, or BITS H."
-
-#         questions = await fetch_questions()
-#         active_quizzes[phone] = {"college": selected_college, "questions": questions, "current": 0}
-#         qd = questions[0]
-#         opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(qd["choices"]))
-#         return (f"To be shown to user: \n🎓 Quiz for {selected_college}!\n"
-#                 f"Q1 ({qd['diff']}): {qd['q']}\n{opts}\n"
-#                 "Reply with @enter_competition answer=<number>")
-
-#     if answer is not None and phone in active_quizzes:
-#         session = active_quizzes[phone]
-#         idx = session["current"]
-#         qd = session["questions"][idx]
-
-#         if not (1 <= answer <= len(qd["choices"])):
-#             return f"❌ Invalid! Pick a number between 1 and {len(qd['choices'])}."
-
-#         is_correct = (qd["choices"][answer - 1] == qd["ans"])
-#         feedback = "✅ Correct! +10 pts." if is_correct else f"❌ Wrong. Correct answer: {qd['ans']}"
-
-#         if is_correct:
-#             cur.execute("UPDATE colleges SET total_score = total_score + 10 WHERE college = ", (session["college"],))
-#             conn.commit()
-
-#         session["current"] += 1
-
-#         if session["current"] >= len(session["questions"]):
-#             college = session["college"]
-#             score = cur.execute("SELECT total_score FROM colleges WHERE college = ?", (college,)).fetchone()[0]
-#             del active_quizzes[phone]
-#             return (f"{feedback}\n\n To be shown to user: \n🎉 Quiz complete for {college}! Total: {score} points\n\n"
-#                     "🏁 Main Menu:\n"
-#                     "• Start Competition → @enter_competition college=<BITS P|BITS G|BITS H>\n"
-#                     "• View Leaderboard → @show_leaderboard")
-
-#         qd = session["questions"][session["current"]]
-#         opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(qd["choices"]))
-#         return (f"{feedback}\n"
-#                 f"Q{session['current'] + 1} ({qd['diff']}): {qd['q']}\n{opts}\n"
-#                 "Reply with @enter_competition answer=<number>")
-
-#     if college and phone in active_quizzes:
-#         return "❗ Quiz already in progress. Please finish current questions first."
-
-#     return "Use @enter_competition college=<A|B|C> to start or @show_leaderboard for rankings."
-@mcp.tool
+@mcp.tool(description="Start a quiz for a selected college or answer a question in progress.")
 async def enter_competition(
-        college: Annotated[str | None, Field(description="College choice: BITS P, BITS G, or BITS H")] = None,
-        answer: Annotated[int | None, Field(description="Answer number to current question")] = None,
-    ) -> str:
-        phone = MY_NUMBER
-    
-        # Menu if nothing provided
-        if phone not in active_quizzes and college is None and answer is None:
-            return ("🏁 Main Menu:\n"
+    college: Annotated[str | None, Field(description="College choice: BITS P, BITS G, or BITS H")] = None,
+    answer: Annotated[int | None, Field(description="Answer number to current question")] = None,
+) -> str:
+    phone = MY_NUMBER
+
+    # Menu view
+    if phone not in active_quizzes and college is None and answer is None:
+        return ("🏁 Main Menu:\n"
+                "• Start Competition → @enter_competition college=<BITS P|BITS G|BITS H>\n"
+                "• View Leaderboard → @show_leaderboard")
+
+    # Start new quiz (abandon old if exists)
+    if college:
+        mapping = {"BITS P": "BITS P", "BITS G": "BITS G", "BITS H": "BITS H"}
+        selected_college = mapping.get(college.upper())
+        if not selected_college:
+            return "❌ Invalid choice. Please use BITS P, BITS G, or BITS H."
+
+        if phone in active_quizzes:
+            print(f"[DEBUG] Abandoning old quiz for {phone} and starting a new one.")
+            del active_quizzes[phone]
+
+        questions = await fetch_questions()
+        active_quizzes[phone] = {"college": selected_college, "questions": questions, "current": 0}
+        qd = questions[0]
+        opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(qd["choices"]))
+        return (f"To be shown to user: \n🎓 Quiz for {selected_college}!\n"
+                f"Q1 ({qd['diff']}): {qd['q']}\n{opts}\n"
+                "Reply with @enter_competition answer=<number>")
+
+    # Process answer
+    if answer is not None and phone in active_quizzes:
+        session = active_quizzes[phone]
+        idx = session["current"]
+        qd = session["questions"][idx]
+
+        print(f"[DEBUG] User picked: {qd['choices'][answer-1]} | Correct answer: {qd['ans']}")
+        if not (1 <= answer <= len(qd["choices"])):
+            return f"❌ Invalid! Pick a number between 1 and {len(qd['choices'])}."
+
+        is_correct = (qd["choices"][answer - 1] == qd["ans"])
+        feedback = "✅ Correct! +10 pts." if is_correct else f"❌ Wrong. Correct answer: {qd['ans']}"
+
+        if is_correct:
+            cur.execute("UPDATE colleges SET total_score = total_score + 10 WHERE college = ?", (session["college"],))
+            print(f"[DEBUG] Updated rows: {cur.rowcount}")
+            conn.commit()
+
+        session["current"] += 1
+
+        if session["current"] >= len(session["questions"]):
+            college = session["college"]
+            score = cur.execute("SELECT total_score FROM colleges WHERE college = ?", (college,)).fetchone()[0]
+            del active_quizzes[phone]
+            return (f"{feedback}\n\n To be shown to user: \n🎉 Quiz complete for {college}! Total: {score} points\n\n"
+                    "🏁 Main Menu:\n"
                     "• Start Competition → @enter_competition college=<BITS P|BITS G|BITS H>\n"
                     "• View Leaderboard → @show_leaderboard")
-    
-        # Handle starting new quiz (even if old one exists)
-        if college:
-            mapping = {"BITS P": "BITS P", "BITS G": "BITS G", "BITS H": "BITS H"}
-            selected_college = mapping.get(college.upper())
-            if not selected_college:
-                return "❌ Invalid choice. Please use BITS P, BITS G, or BITS H."
-    
-            # Abandon any existing quiz
-            if phone in active_quizzes:
-                print(f"[DEBUG] Abandoning old quiz for {phone} and starting a new one.")
-                del active_quizzes[phone]
-    
-            # Start fresh quiz
-            questions = await fetch_questions()
-            active_quizzes[phone] = {"college": selected_college, "questions": questions, "current": 0}
-            qd = questions[0]
-            opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(qd["choices"]))
-            return (f"To be shown to user: \n🎓 Quiz for {selected_college}!\n"
-                    f"Q1 ({qd['diff']}): {qd['q']}\n{opts}\n"
-                    "Reply with @enter_competition answer=<number>")
-    
-        # Process answer if quiz active
-        if answer is not None and phone in active_quizzes:
-            session = active_quizzes[phone]
-            idx = session["current"]
-            qd = session["questions"][idx]
-    
-            if not (1 <= answer <= len(qd["choices"])):
-                return f"❌ Invalid! Pick a number between 1 and {len(qd['choices'])}."
-    
-            is_correct = (qd["choices"][answer - 1] == qd["ans"])
-            feedback = "✅ Correct! +10 pts." if is_correct else f"❌ Wrong. Correct answer: {qd['ans']}"
-    
-            if is_correct:
-                cur.execute("UPDATE colleges SET total_score = total_score + 10 WHERE college = ?", (session["college"],))
-                conn.commit()
-    
-            session["current"] += 1
-    
-            if session["current"] >= len(session["questions"]):
-                college = session["college"]
-                score = cur.execute("SELECT total_score FROM colleges WHERE college = ?", (college,)).fetchone()[0]
-                del active_quizzes[phone]
-                return (f"{feedback}\n\n To be shown to user: \n🎉 Quiz complete for {college}! Total: {score} points\n\n"
-                        "🏁 Main Menu:\n"
-                        "• Start Competition → @enter_competition college=<BITS P|BITS G|BITS H>\n"
-                        "• View Leaderboard → @show_leaderboard")
-    
-            qd = session["questions"][session["current"]]
-            opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(qd["choices"]))
-            return (f"{feedback}\n"
-                    f"Q{session['current'] + 1} ({qd['diff']}): {qd['q']}\n{opts}\n"
-                    "Reply with @enter_competition answer=<number>")
-    
-        return "Use @enter_competition college=<BITS P|BITS G|BITS H> to start or @show_leaderboard for rankings."
+
+        # Next question
+        qd = session["questions"][session["current"]]
+        opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(qd["choices"]))
+        return (f"{feedback}\n"
+                f"Q{session['current'] + 1} ({qd['diff']}): {qd['q']}\n{opts}\n"
+                "Reply with @enter_competition answer=<number>")
+
+    return "Use @enter_competition college=<BITS P|BITS G|BITS H> to start or @show_leaderboard for rankings."
 
 
 # --- Run server ---
@@ -245,7 +200,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
-
-
