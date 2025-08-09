@@ -176,14 +176,26 @@ async def enter_competition(
                 "Reply with @enter_competition answer=<number>")
 
     return "Use @enter_competition college=<BITS P|BITS G|BITS H> to start or @show_leaderboard for rankings."
-import base64
-import io
-import numpy as np
-from PIL import Image, ImageEnhance, ImageOps, ImageFilter
+import asyncio
 from typing import Annotated
-from fastmcp.types import Image
-from mcp.types import Field
+import os
+from dotenv import load_dotenv
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
+from mcp import ErrorData, McpError
+from mcp.server.auth.provider import AccessToken
+from mcp.types import TextContent, ImageContent, INVALID_PARAMS, INTERNAL_ERROR
+from pydantic import BaseModel, Field, AnyUrl
 
+import markdownify
+import httpx
+import readabilipy
+
+# Extended imports allowed through MCP Image type and numpy usage in httpx environment
+import numpy as np
+from PIL import Image, ImageEnhance
+
+# Define the iPhone 3GS effect filter function
 def apply_iphone3gs_effect_pil(img: Image.Image) -> Image.Image:
     # 1. Downscale and upscale to simulate low resolution
     w, h = img.size
@@ -225,8 +237,8 @@ def apply_iphone3gs_effect_pil(img: Image.Image) -> Image.Image:
 
 @mcp.tool(description="Apply iPhone 3GS camera effect to the input photo without using OpenCV.")
 async def iphone_3gs(
-    photo: Annotated[Image, Field(description="Input photo to transform")]
-) -> Image:
+    photo: Annotated['Image', Field(description="Input photo to transform")]
+) -> 'Image':
     # Convert MCP Image to Pillow Image
     pil_img = photo.to_pil()
 
@@ -234,7 +246,7 @@ async def iphone_3gs(
     filtered_img = apply_iphone3gs_effect_pil(pil_img)
 
     # Convert back to MCP Image and return
-    return Image.from_pil(filtered_img)
+    return photo.from_pil(filtered_img)
 
 
 # --- Run server ---
@@ -244,6 +256,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
