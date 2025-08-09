@@ -581,19 +581,32 @@ async def horoscope(
     """
     Get daily horoscope for a given sign and day from the Aztro API via RapidAPI.
     """
+    # headers = {
+    #     "x-rapidapi-key": API_KEY,
+    #     "x-rapidapi-host": "sameer-kumar-aztro-v1.p.rapidapi.com",
+    #     "Content-Type": "application/json"
+    # }
+    # params = {"sign": sign, "day": day}
+
+    # async with httpx.AsyncClient(timeout=10.0) as client:
+    #     resp = await client.post(API_URL, headers=headers, params=params)
+    #     resp.raise_for_status()
+    #     data = resp.json()
+
+    # return data.get("description", "No prediction available.")
     headers = {
         "x-rapidapi-key": API_KEY,
         "x-rapidapi-host": "sameer-kumar-aztro-v1.p.rapidapi.com",
-        "Content-Type": "application/json"
+        "Content-Type": "application/x-www-form-urlencoded"
     }
-    params = {"sign": sign, "day": day}
-
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.post(API_URL, headers=headers, params=params)
-        resp.raise_for_status()
-        data = resp.json()
-
-    return data.get("description", "No prediction available.")
+    data = {
+        "sign": sign.lower(),
+        "day": day.lower()
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(url, headers=headers, data=data)
+            resp.raise_for_status()
+            return resp.json()
 
 
 # --- Run server ---
@@ -603,6 +616,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
