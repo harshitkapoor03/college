@@ -389,26 +389,90 @@ async def vintage_photo_filter(
     except Exception as e:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 #----------------------------------------------------------------tool horoscope#
-import os
-import re
-import io
-import base64
-import random
-import sqlite3
-import asyncio
-from typing import Annotated
-import httpx
+# import os
+# import re
+# import io
+# import base64
+# import random
+# import sqlite3
+# import asyncio
+# from typing import Annotated
+# import httpx
 
-# FastMCP + auth
-from fastmcp import FastMCP
-from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
-from mcp.server.auth.provider import AccessToken
-from mcp import ErrorData, McpError
-from mcp.types import Field, TextContent, ImageContent, INTERNAL_ERROR
-VALID_SIGNS = {
-    "aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces"
-}
+# # FastMCP + auth
+# from fastmcp import FastMCP
+# from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
+# from mcp.server.auth.provider import AccessToken
+# from mcp import ErrorData, McpError
+# from mcp.types import Field, TextContent, ImageContent, INTERNAL_ERROR
+# VALID_SIGNS = {
+#     "aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces"
+# }
 
+# # @mcp.tool(description="Get daily horoscope. Usage: @horoscope sign=<aries> day=<today|yesterday|tomorrow>")
+# # async def horoscope(
+# #     sign: Annotated[str, Field(description="Zodiac sign e.g. aries")] = None,
+# #     day: Annotated[str | None, Field(description="today|yesterday|tomorrow")] = "today",
+# # ) -> str:
+# #     if not sign:
+# #         raise McpError(ErrorData(code=INTERNAL_ERROR, message="Please provide a zodiac sign (e.g. aries)."))
+# #     sign_l = sign.strip().lower()
+# #     if sign_l not in VALID_SIGNS:
+# #         return f"❌ Unknown sign '{sign}'. Valid: {', '.join(sorted(VALID_SIGNS))}"
+
+# #     params = {"sign": sign_l, "day": day or "today"}
+# #     try:
+# #         async with httpx.AsyncClient() as client:
+# #             resp = await client.post("https://aztro.sameerkumar.website/", params=params, timeout=10)
+# #             data = resp.json()
+# #     except Exception as e:
+# #         raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Horoscope fetch failed: {e}"))
+
+# #     # Aztro response fields: description, mood, color, lucky_number, lucky_time, compatibility, current_date
+# #     desc = data.get("description", "(no description)")
+# #     mood = data.get("mood", "")
+# #     color = data.get("color", "")
+# #     lucky_num = data.get("lucky_number", "")
+# #     lucky_time = data.get("lucky_time", "")
+# #     date = data.get("current_date", "")
+
+# #     return (f"🔮 Horoscope — {sign_l.capitalize()} — {date}\n\n"
+# #             f"{desc}\n\n"
+# #             f"• Mood: {mood}\n• Color: {color}\n• Lucky number: {lucky_num}\n• Lucky time: {lucky_time}")
+# # # import httpx
+# # # from mcp import McpError, ErrorData, INTERNAL_ERROR
+# # # from mcp.types import Field
+
+# # # VALID_SIGNS = {
+# # #     "aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces"
+# # # }
+
+# # # @mcp.tool(description="Get daily horoscope. Usage: @horoscope sign=<aries>")
+# # # async def horoscope(
+# # #     sign: Annotated[str, Field(description="Zodiac sign e.g. aries")] = None,
+# # # ) -> str:
+# # #     if not sign:
+# # #         raise McpError(ErrorData(code=INTERNAL_ERROR, message="Please provide a zodiac sign (e.g. aries)."))
+# # #     sign_l = sign.strip().lower()
+# # #     if sign_l not in VALID_SIGNS:
+# # #         return f"❌ Unknown sign '{sign}'. Valid: {', '.join(sorted(VALID_SIGNS))}"
+
+# # #     url = f"https://horoscope-api.herokuapp.com/horoscope/today/{sign_l}"
+# # #     try:
+# # #         async with httpx.AsyncClient() as client:
+# # #             resp = await client.get(url, timeout=10)
+# # #             resp.raise_for_status()
+# # #             data = resp.json()
+# # #     except Exception as e:
+# # #         raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Horoscope fetch failed: {e}"))
+
+# # #     description = data.get("horoscope", "(no description)")
+# # #     date_range = data.get("date_range", "")
+# # #     current_date = data.get("current_date", "") or ""
+
+# # #     return (f"🔮 Horoscope — {sign_l.capitalize()} — {current_date}\n"
+# # #             f"Date Range: {date_range}\n\n"
+# # #             f"{description}")
 # @mcp.tool(description="Get daily horoscope. Usage: @horoscope sign=<aries> day=<today|yesterday|tomorrow>")
 # async def horoscope(
 #     sign: Annotated[str, Field(description="Zodiac sign e.g. aries")] = None,
@@ -416,19 +480,27 @@ VALID_SIGNS = {
 # ) -> str:
 #     if not sign:
 #         raise McpError(ErrorData(code=INTERNAL_ERROR, message="Please provide a zodiac sign (e.g. aries)."))
+
 #     sign_l = sign.strip().lower()
 #     if sign_l not in VALID_SIGNS:
 #         return f"❌ Unknown sign '{sign}'. Valid: {', '.join(sorted(VALID_SIGNS))}"
 
+#     url = "https://sameer-kumar-aztro-v1.p.rapidapi.com/"
 #     params = {"sign": sign_l, "day": day or "today"}
+#     headers = {
+#         "x-rapidapi-key": "7bd7d59100msha77016cf106a0aap196edejsnabf8fbb51149",  # your RapidAPI key
+#         "x-rapidapi-host": "sameer-kumar-aztro-v1.p.rapidapi.com",
+#         "Content-Type": "application/json"
+#     }
+
 #     try:
 #         async with httpx.AsyncClient() as client:
-#             resp = await client.post("https://aztro.sameerkumar.website/", params=params, timeout=10)
+#             resp = await client.post(url, headers=headers, params=params, timeout=10)
+#             resp.raise_for_status()
 #             data = resp.json()
 #     except Exception as e:
 #         raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Horoscope fetch failed: {e}"))
 
-#     # Aztro response fields: description, mood, color, lucky_number, lucky_time, compatibility, current_date
 #     desc = data.get("description", "(no description)")
 #     mood = data.get("mood", "")
 #     color = data.get("color", "")
@@ -439,79 +511,67 @@ VALID_SIGNS = {
 #     return (f"🔮 Horoscope — {sign_l.capitalize()} — {date}\n\n"
 #             f"{desc}\n\n"
 #             f"• Mood: {mood}\n• Color: {color}\n• Lucky number: {lucky_num}\n• Lucky time: {lucky_time}")
-# # import httpx
-# # from mcp import McpError, ErrorData, INTERNAL_ERROR
-# # from mcp.types import Field
 
-# # VALID_SIGNS = {
-# #     "aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces"
-# # }
+import asyncio
+import sqlite3
+import httpx
+from fastmcp import FastMCP
+from mcp.types import Field
 
-# # @mcp.tool(description="Get daily horoscope. Usage: @horoscope sign=<aries>")
-# # async def horoscope(
-# #     sign: Annotated[str, Field(description="Zodiac sign e.g. aries")] = None,
-# # ) -> str:
-# #     if not sign:
-# #         raise McpError(ErrorData(code=INTERNAL_ERROR, message="Please provide a zodiac sign (e.g. aries)."))
-# #     sign_l = sign.strip().lower()
-# #     if sign_l not in VALID_SIGNS:
-# #         return f"❌ Unknown sign '{sign}'. Valid: {', '.join(sorted(VALID_SIGNS))}"
+# mcp = FastMCP()
 
-# #     url = f"https://horoscope-api.herokuapp.com/horoscope/today/{sign_l}"
-# #     try:
-# #         async with httpx.AsyncClient() as client:
-# #             resp = await client.get(url, timeout=10)
-# #             resp.raise_for_status()
-# #             data = resp.json()
-# #     except Exception as e:
-# #         raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Horoscope fetch failed: {e}"))
+# --- DB Setup ---
+conn = sqlite3.connect("horoscope.db")
+curs = conn.cursor()
+curs.execute("""
+CREATE TABLE IF NOT EXISTS history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sign TEXT,
+    day TEXT,
+    prediction TEXT
+)
+""")
+conn.commit()
 
-# #     description = data.get("horoscope", "(no description)")
-# #     date_range = data.get("date_range", "")
-# #     current_date = data.get("current_date", "") or ""
+API_URL = "https://aztro.sameerkumar.website"
 
-# #     return (f"🔮 Horoscope — {sign_l.capitalize()} — {current_date}\n"
-# #             f"Date Range: {date_range}\n\n"
-# #             f"{description}")
-@mcp.tool(description="Get daily horoscope. Usage: @horoscope sign=<aries> day=<today|yesterday|tomorrow>")
+@mcp.tool()
 async def horoscope(
-    sign: Annotated[str, Field(description="Zodiac sign e.g. aries")] = None,
-    day: Annotated[str | None, Field(description="today|yesterday|tomorrow")] = "today",
+    sign: Annotated[str, Field(description="Zodiac sign (e.g., 'aries', 'leo')")],
+    day: Annotated[str, Field(description="'today', 'tomorrow', or 'yesterday'")]
 ) -> str:
-    if not sign:
-        raise McpError(ErrorData(code=INTERNAL_ERROR, message="Please provide a zodiac sign (e.g. aries)."))
-
-    sign_l = sign.strip().lower()
-    if sign_l not in VALID_SIGNS:
-        return f"❌ Unknown sign '{sign}'. Valid: {', '.join(sorted(VALID_SIGNS))}"
-
-    url = "https://sameer-kumar-aztro-v1.p.rapidapi.com/"
-    params = {"sign": sign_l, "day": day or "today"}
-    headers = {
-        "x-rapidapi-key": "7bd7d59100msha77016cf106a0aap196edejsnabf8fbb51149",  # your RapidAPI key
-        "x-rapidapi-host": "sameer-kumar-aztro-v1.p.rapidapi.com",
-        "Content-Type": "application/json"
-    }
-
+    """
+    Get daily horoscope for a given sign and day from Aztro API.
+    """
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(url, headers=headers, params=params, timeout=10)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                API_URL,
+                params={"sign": sign, "day": day}  # Aztro takes params in POST
+            )
             resp.raise_for_status()
             data = resp.json()
+
+        prediction = data.get("description", "No prediction available.")
+
+        # Save to DB
+        curs.execute(
+            "INSERT INTO history (sign, day, prediction) VALUES (?, ?, ?)",
+            (sign, day, prediction)
+        )
+        conn.commit()
+
+        return f"Horoscope for {sign} ({day}): {prediction}"
+
+    except httpx.RequestError as e:
+        return f"Error connecting to Aztro API: {e}"
+    except httpx.HTTPStatusError as e:
+        return f"API returned error {e.response.status_code}: {e.response.text}"
     except Exception as e:
-        raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Horoscope fetch failed: {e}"))
+        return f"Unexpected error: {e}"
 
-    desc = data.get("description", "(no description)")
-    mood = data.get("mood", "")
-    color = data.get("color", "")
-    lucky_num = data.get("lucky_number", "")
-    lucky_time = data.get("lucky_time", "")
-    date = data.get("current_date", "")
-
-    return (f"🔮 Horoscope — {sign_l.capitalize()} — {date}\n\n"
-            f"{desc}\n\n"
-            f"• Mood: {mood}\n• Color: {color}\n• Lucky number: {lucky_num}\n• Lucky time: {lucky_time}")
-
+if __name__ == "__main__":
+    mcp.run()
 
 
 # --- Run server ---
@@ -521,6 +581,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
