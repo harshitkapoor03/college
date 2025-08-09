@@ -176,69 +176,65 @@ async def enter_competition(
                 "Reply with @enter_competition answer=<number>")
 
     return "Use @enter_competition college=<BITS P|BITS G|BITS H> to start or @show_leaderboard for rankings."
-@mcp.tool(description="Apply iPhone 3GS camera effect to the input photo.")
+import base64
+import io
+import numpy as np
+from PIL import Image, ImageEnhance, ImageOps, ImageFilter
+from typing import Annotated
+from fastmcp.types import Image
+from mcp.types import Field
+
+def apply_iphone3gs_effect_pil(img: Image.Image) -> Image.Image:
+    # 1. Downscale and upscale to simulate low resolution
+    w, h = img.size
+    small = img.resize((w // 2, h // 2), Image.LANCZOS)
+    img_lr = small.resize((w, h), Image.NEAREST)
+
+    # 2. Muted saturation and contrast
+    # Convert to HSV
+    hsv = img_lr.convert('HSV')
+    h_s, s_s, v_s = hsv.split()
+    # Reduce saturation
+    s_s = ImageEnhance.Brightness(s_s).enhance(0.67)
+    # Slightly darken value
+    v_s = ImageEnhance.Brightness(v_s).enhance(1.0)  # can reduce below 1 if desired
+    hsv = Image.merge('HSV', (h_s, s_s, v_s))
+    img_color = hsv.convert('RGB')
+
+    # 3. Add organic-style noise
+    np_img = np.array(img_color).astype(np.int16)
+    noise = np.random.normal(0, 25, np_img.shape).astype(np.int16)
+    np_noisy = np.clip(np_img + noise, 0, 255).astype(np.uint8)
+    img_noisy = Image.fromarray(np_noisy)
+
+    # 4. Vignette effect
+    # Create vignette mask
+    x = np.linspace(-1, 1, w)
+    y = np.linspace(-1, 1, h)
+    X, Y = np.meshgrid(x, y)
+    radius = np.sqrt(X**2 + Y**2)
+    mask = np.clip(1 - radius, 0, 1)
+    mask = (mask * 255).astype(np.uint8)
+    vignette = Image.fromarray(mask).resize((w, h))
+    # Convert mask to 3 channels
+    vignette_rgb = Image.merge('RGB', (vignette, vignette, vignette))
+    # Apply the vignette as a blend
+    img_vignette = Image.composite(img_noisy, Image.new('RGB', img_noisy.size, 'black'), vignette_rgb)
+
+    return img_vignette
+
+@mcp.tool(description="Apply iPhone 3GS camera effect to the input photo without using OpenCV.")
 async def iphone_3gs(
-    puch_image_data: Annotated[str, Field(description="Base64-encoded image data for photo to transform")] = None,
-) -> list[TextContent | ImageContent]:
-    import base64
-    import io
-    import numpy as np
-    from PIL import Image, ImageEnhance, ImageFilter
+    photo: Annotated[Image, Field(description="Input photo to transform")]
+) -> Image:
+    # Convert MCP Image to Pillow Image
+    pil_img = photo.to_pil()
 
-    try:
-        # Decode base64 input
-        image_bytes = base64.b64decode(puch_image_data)
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    # Apply the effect
+    filtered_img = apply_iphone3gs_effect_pil(pil_img)
 
-        # 1. Downscale and upscale to simulate low resolution (half size)
-        small = image.resize((image.width // 2, image.height // 2), resample=Image.BILINEAR)
-        img_lr = small.resize(image.size, resample=Image.NEAREST)
-
-        # 2. Muted saturation and contrast
-        enhancer_sat = ImageEnhance.Color(img_lr)
-        img_less_sat = enhancer_sat.enhance(0.67)  # reduce saturation
-
-        enhancer_brightness = ImageEnhance.Brightness(img_less_sat)
-        img_dark = enhancer_brightness.enhance(0.9)  # slightly darken
-
-        enhancer_contrast = ImageEnhance.Contrast(img_dark)
-        img_contrast = enhancer_contrast.enhance(1.1)  # subtle contrast increase
-
-        # 3. Add organic-style noise
-        img_np = np.array(img_contrast).astype(np.int16)
-        noise = np.random.normal(0, 20, img_np.shape).astype(np.int16)
-        img_np_noisy = img_np + noise
-        img_np_noisy = np.clip(img_np_noisy, 0, 255).astype(np.uint8)
-        img_noisy = Image.fromarray(img_np_noisy)
-
-        # 4. Apply vignette effect using radial gradient mask
-        width, height = img_noisy.size
-        vignette = Image.new("L", (width, height), 0)
-        for y in range(height):
-            for x in range(width):
-                # Distance from center normalized
-                dx = (x - width / 2) / (width / 2)
-                dy = (y - height / 2) / (height / 2)
-                dist = (dx*dx + dy*dy) ** 0.5
-                # Vignette mask: 255 in center, 0 at edges (adjust exponent for softness)
-                val = max(0, 255 - int(dist * 255 * 1.5))
-                vignette.putpixel((x, y), val)
-        # Apply vignette mask to each channel
-        img_rgba = img_noisy.convert("RGBA")
-        vignette = vignette.filter(ImageFilter.GaussianBlur(radius=width * 0.1))
-        alpha = vignette.point(lambda i: i * 0.7)  # adjust vignette strength
-        img_rgba.putalpha(alpha)
-        img_final = img_rgba.convert("RGB")
-
-        # Encode output image as base64 PNG
-        buf = io.BytesIO()
-        img_final.save(buf, format="PNG")
-        bw_bytes = buf.getvalue()
-        bw_base64 = base64.b64encode(bw_bytes).decode("utf-8")
-
-        return [ImageContent(type="image", mimeType="image/png", data=bw_base64)]
-    except Exception as e:
-        raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
+    # Convert back to MCP Image and return
+    return Image.from_pil(filtered_img)
 
 
 # --- Run server ---
@@ -248,5 +244,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
