@@ -178,6 +178,29 @@ async def enter_competition(
     return "Use @enter_competition college=<BITS P|BITS G|BITS H> to start or @show_leaderboard for rankings."
 
 
+@mcp.tool(description="Apply a vintage Kodak-style filter to the input photo.")
+async def vintage_photo(
+    puch_image_data: Annotated[str, Field(description="Base64-encoded image data to transform")] = None,
+) -> str:
+    import base64, io
+    from PIL import Image, ImageEnhance, ImageFilter
+    try:
+        image_bytes = base64.b64decode(puch_image_data)
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        # Apply color tint (yellow/warm for Kodak look)
+        r, g, b = image.split()
+        r = r.point(lambda i: i * 1.02)
+        g = g.point(lambda i: i * 1.01)
+        b = b.point(lambda i: i * 0.95)
+        image = Image.merge("RGB", (r,g,b))
+        # Add slight blur/noise for retro feel
+        image = image.filter(ImageFilter.GaussianBlur(radius=1.3))
+        # Export back to base64 string
+        buf = io.BytesIO()
+        image.save(buf, format="PNG")
+        return base64.b64encode(buf.getvalue()).decode("utf-8")
+    except Exception as e:
+        return f"⚠️ {e}"
 
 # --- Run server ---
 async def main():
@@ -186,6 +209,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
