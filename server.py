@@ -570,41 +570,63 @@ async def vintage_photo_filter(
     # except Exception as e:
     #     return f"Unexpected error: {e}"
 
-API_URL = "https://sameer-kumar-aztro-v1.p.rapidapi.com/"
-API_KEY = "7bd7d59100msha77016cf106a0aap196edejsnabf8fbb51149"  # Replace with your real RapidAPI key
+# API_URL = "https://sameer-kumar-aztro-v1.p.rapidapi.com/"
+# API_KEY = "7bd7d59100msha77016cf106a0aap196edejsnabf8fbb51149"  # Replace with your real RapidAPI key
 
+# @mcp.tool(description="Get daily horoscope")
+# async def horoscope(
+#     sign: Annotated[str, Field(description="Zodiac sign (e.g., 'aries', 'leo')")],
+#     day: Annotated[str, Field(description="'today', 'tomorrow', or 'yesterday'")] = "today"
+# ) -> str:
+#     """
+#     Get daily horoscope for a given sign and day from the Aztro API via RapidAPI.
+#     """
+#     # headers = {
+#     #     "x-rapidapi-key": API_KEY,
+#     #     "x-rapidapi-host": "sameer-kumar-aztro-v1.p.rapidapi.com",
+#     #     "Content-Type": "application/json"
+#     # }
+#     # params = {"sign": sign, "day": day}
+
+#     # async with httpx.AsyncClient(timeout=10.0) as client:
+#     #     resp = await client.post(API_URL, headers=headers, params=params)
+#     #     resp.raise_for_status()
+#     #     data = resp.json()
+
+#     # return data.get("description", "No prediction available.")
+#     headers = {
+#         "x-rapidapi-key": API_KEY,
+#         "x-rapidapi-host": "sameer-kumar-aztro-v1.p.rapidapi.com",
+#         "Content-Type": "application/x-www-form-urlencoded"
+#     }
+#     data = {
+#         "sign": sign.lower(),
+#         "day": day.lower()
+#     }
+#     async with httpx.AsyncClient(timeout=10) as client:
+#             resp = await client.post(API_URL, headers=headers, data=data)
+#             resp.raise_for_status()
+#             return resp.json()
 @mcp.tool(description="Get daily horoscope")
 async def horoscope(
-    sign: Annotated[str, Field(description="Zodiac sign (e.g., 'aries', 'leo')")],
+    sign: Annotated[str, Field(description="Zodiac sign, e.g., aries, taurus, gemini")],
     day: Annotated[str, Field(description="'today', 'tomorrow', or 'yesterday'")] = "today"
-) -> str:
+) -> dict:
     """
-    Get daily horoscope for a given sign and day from the Aztro API via RapidAPI.
+    Get daily horoscope for a given sign and day from the official Aztro API.
     """
-    # headers = {
-    #     "x-rapidapi-key": API_KEY,
-    #     "x-rapidapi-host": "sameer-kumar-aztro-v1.p.rapidapi.com",
-    #     "Content-Type": "application/json"
-    # }
-    # params = {"sign": sign, "day": day}
 
-    # async with httpx.AsyncClient(timeout=10.0) as client:
-    #     resp = await client.post(API_URL, headers=headers, params=params)
-    #     resp.raise_for_status()
-    #     data = resp.json()
+    url = "https://aztro.sameerkumar.website/"
 
-    # return data.get("description", "No prediction available.")
-    headers = {
-        "x-rapidapi-key": API_KEY,
-        "x-rapidapi-host": "sameer-kumar-aztro-v1.p.rapidapi.com",
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
-    data = {
+    params = {
         "sign": sign.lower(),
         "day": day.lower()
     }
-    async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(API_URL, headers=headers, data=data)
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            # Official Aztro API requires POST, but params go in the query string
+            resp = await client.post(url, params=params)
             resp.raise_for_status()
             return resp.json()
 
@@ -616,6 +638,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
