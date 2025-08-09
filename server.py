@@ -7,7 +7,6 @@ from fastmcp import FastMCP
 from mcp.types import Field
 from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
 from mcp.server.auth.provider import AccessToken
-from fastmcp.server.types import Context  # ✅ Correct context import for session_id
 
 # --- DB Setup ---
 conn = sqlite3.connect("leaderboard.db", check_same_thread=False)
@@ -22,11 +21,11 @@ for c in ["BITS", "P", "G/H"]:
     cur.execute("INSERT OR IGNORE INTO colleges (college) VALUES (?)", (c,))
 conn.commit()
 
-# --- MCP Config ---
+# --- Config ---
 TOKEN = "730E024D"
-OWNER_PHONE = "917044607962"  # ✅ for Puch AI validate tool
+OWNER_PHONE = "917044607962"  # Required format for Puch AI validate tool
 COLLEGE_MAP = {"A": "BITS", "B": "P", "C": "G/H"}
-active_quizzes = {}  # Stores per-session quiz state
+active_quizzes = {}  # Per-session quiz storage
 
 # --- Auth Provider ---
 class SimpleBearerAuthProvider(BearerAuthProvider):
@@ -40,10 +39,12 @@ class SimpleBearerAuthProvider(BearerAuthProvider):
 
     async def load_access_token(self, token: str) -> AccessToken | None:
         if token == self.token:
-            return AccessToken(token=token,
-                               client_id="client",
-                               scopes=["*"],
-                               expires_at=None)
+            return AccessToken(
+                token=token,
+                client_id="client",
+                scopes=["*"],
+                expires_at=None
+            )
         return None
 
 # --- MCP Server ---
@@ -61,8 +62,7 @@ async def fetch_questions():
                     timeout=10
                 )
                 if resp.status_code == 200:
-                    data = resp.json().get("results", [])
-                    for item in data:
+                    for item in resp.json().get("results", []):
                         q = item["question"].replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&")
                         choices = [
                             ch.replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&")
@@ -70,23 +70,20 @@ async def fetch_questions():
                         ]
                         correct = item["correct_answer"].replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&")
                         random.shuffle(choices)
-                        questions.append({
-                            "diff": diff.capitalize(),
-                            "q": q,
-                            "choices": choices,
-                            "ans": correct
-                        })
+                        questions.append({"diff": diff.capitalize(), "q": q, "choices": choices, "ans": correct})
     except Exception as e:
         print(f"[ERROR] Error fetching trivia: {e}")
 
+    # Fallback questions if fewer than 5
     if len(questions) < 5:
-        questions.extend([
+        fallback = [
             {"diff": "Easy", "q": "What is 2 + 2?", "choices": ["3", "4", "5", "6"], "ans": "4"},
             {"diff": "Medium", "q": "What is the capital of France?", "choices": ["London", "Berlin", "Paris", "Madrid"], "ans": "Paris"},
             {"diff": "Hard", "q": "What is the derivative of x²?", "choices": ["x", "2x", "x²", "2"], "ans": "2x"},
             {"diff": "Hard", "q": "What is the square root of 144?", "choices": ["10", "11", "12", "13"], "ans": "12"},
             {"diff": "Hard", "q": "What year did World War II end?", "choices": ["1944", "1945", "1946", "1947"], "ans": "1945"},
-        ][:5 - len(questions)])
+        ]
+        questions.extend(fallback[:5 - len(questions)])
     return questions[:5]
 
 # --- Tools ---
@@ -102,18 +99,18 @@ async def show_leaderboard() -> str:
     header = "🏆 College Competition Leaderboard\n"
     if not any(score > 0 for _, score in rows):
         return header + "No scores yet—be the first!\nStart quiz: @start_quiz college=<A|B|C>"
-    lines = []
-    for i, (college, score) in enumerate(rows):
-        medal = medals[i] if i < 3 else ""
-        lines.append(f"{medal} {college}: {score} points")
+    lines = [
+        f"{medals[i] if i < 3 else ''} {college}: {score} points"
+        for i, (college, score) in enumerate(rows)
+    ]
     return header + "\n".join(lines)
 
 @mcp.tool
-async def start_quiz(context: Context,
+async def start_quiz(context,
                      college: Annotated[str, Field(description="College choice: A, B, or C")]) -> str:
     session_id = context.session_id
     if not session_id:
-        return "❌ Session context not found. Please reconnect."
+        return "❌ Session ID not found. Please reconnect."
 
     if session_id in active_quizzes:
         return "❗ You already have a quiz active! Finish it before starting another."
@@ -123,12 +120,7 @@ async def start_quiz(context: Context,
         return "❌ Invalid college. Please use A (BITS), B (P), or C (G/H)."
 
     questions = await fetch_questions()
-    active_quizzes[session_id] = {
-        "college": selected_college,
-        "questions": questions,
-        "current": 0,
-        "score": 0
-    }
+    active_quizzes[session_id] = {"college": selected_college, "questions": questions, "current": 0, "score": 0}
     qd = questions[0]
     opts = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(qd["choices"]))
     return (
@@ -138,7 +130,7 @@ async def start_quiz(context: Context,
     )
 
 @mcp.tool
-async def answer_question(context: Context,
+async def answer_question(context,
                           answer: Annotated[int, Field(description="Answer number for current question")]) -> str:
     session_id = context.session_id
     session = active_quizzes.get(session_id)
@@ -147,30 +139,23 @@ async def answer_question(context: Context,
 
     idx = session["current"]
     qd = session["questions"][idx]
-
     if not (1 <= answer <= len(qd["choices"])):
         return f"❌ Invalid choice! Pick 1–{len(qd['choices'])}."
 
-    chosen = qd["choices"][answer - 1]
-    is_correct = chosen == qd["ans"]
+    is_correct = qd["choices"][answer - 1] == qd["ans"]
     feedback = "✅ Correct! +10 pts." if is_correct else f"❌ Wrong. Correct answer: {qd['ans']}"
-
     if is_correct:
         session["score"] += 10
 
     session["current"] += 1
 
+    # End of quiz
     if session["current"] >= len(session["questions"]):
-        # Quiz finished
-        cur.execute(
-            "UPDATE colleges SET total_score = total_score + ? WHERE college = ?",
-            (session["score"], session["college"])
-        )
+        cur.execute("UPDATE colleges SET total_score = total_score + ? WHERE college = ?",
+                    (session["score"], session["college"]))
         conn.commit()
-        total_score = cur.execute(
-            "SELECT total_score FROM colleges WHERE college = ?",
-            (session["college"],)
-        ).fetchone()[0]
+        total_score = cur.execute("SELECT total_score FROM colleges WHERE college = ?",
+                                  (session["college"],)).fetchone()[0]
         del active_quizzes[session_id]
         return (
             f"{feedback}\n\n"
