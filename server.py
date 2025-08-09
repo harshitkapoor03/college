@@ -620,7 +620,7 @@ async def horoscope(
     import httpx
     import os
 
-    API_KEY = os.getenv("RAPIDAPI_KEY")  # store key in environment variables
+    API_KEY = "7bd7d59100msha77016cf106a0aap196edejsnabf8fbb51149"  # store key in environment variables
     API_URL = "https://astropredict-daily-horoscopes-lucky-insights.p.rapidapi.com/horoscope"
 
     headers = {
@@ -652,6 +652,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
