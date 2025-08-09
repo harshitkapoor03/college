@@ -178,29 +178,54 @@ async def enter_competition(
     return "Use @enter_competition college=<BITS P|BITS G|BITS H> to start or @show_leaderboard for rankings."
 
 
-@mcp.tool(description="Apply a vintage Kodak-style filter to the input photo.")
-async def vintage_photo(
+from typing import Annotated
+from mcp.types import TextContent, ImageContent, INTERNAL_ERROR
+from mcp import ErrorData, McpError
+from pydantic import Field
+
+@mcp.tool(description="Apply Kodak vintage-style filter to an input photo.")
+async def vintage_photo_filter(
     puch_image_data: Annotated[str, Field(description="Base64-encoded image data to transform")] = None,
-) -> str:
-    import base64, io
+) -> list[TextContent | ImageContent]:
+    import base64
+    import io
     from PIL import Image, ImageEnhance, ImageFilter
+    import numpy as np
+
     try:
+        # Decode input base64 image
         image_bytes = base64.b64decode(puch_image_data)
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        # Apply color tint (yellow/warm for Kodak look)
+
+        # Apply Kodak-style warm tint
         r, g, b = image.split()
         r = r.point(lambda i: i * 1.02)
         g = g.point(lambda i: i * 1.01)
         b = b.point(lambda i: i * 0.95)
-        image = Image.merge("RGB", (r,g,b))
-        # Add slight blur/noise for retro feel
+        image = Image.merge("RGB", (r, g, b))
+
+        # Add slight Gaussian blur for vintage feel
         image = image.filter(ImageFilter.GaussianBlur(radius=1.3))
-        # Export back to base64 string
+
+        # (Optional) Add grain/noise - convert to np, add noise, convert back
+        img_np = np.array(image).astype(np.int16)
+        noise = np.random.normal(0, 10, img_np.shape).astype(np.int16)
+        img_noisy = np.clip(img_np + noise, 0, 255).astype(np.uint8)
+        image = Image.fromarray(img_noisy)
+
+        # Save processed image to bytes buffer as PNG
         buf = io.BytesIO()
         image.save(buf, format="PNG")
-        return base64.b64encode(buf.getvalue()).decode("utf-8")
+        output_bytes = buf.getvalue()
+
+        # Encode output image as base64
+        encoded_img = base64.b64encode(output_bytes).decode("utf-8")
+
+        # Return as list with ImageContent object
+        return [ImageContent(type="image", mimeType="image/png", data=encoded_img)]
+
     except Exception as e:
-        return f"⚠️ {e}"
+        raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
 # --- Run server ---
 async def main():
@@ -209,6 +234,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
