@@ -521,8 +521,8 @@ from mcp.types import Field
 # mcp = FastMCP()
 
 # --- DB Setup ---
-conn = sqlite3.connect("horoscope.db")
-curs = conn.cursor()
+astro_conn = sqlite3.connect("horoscope.db")
+curs = astro_conn.cursor()
 curs.execute("""
 CREATE TABLE IF NOT EXISTS history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -531,7 +531,7 @@ CREATE TABLE IF NOT EXISTS history (
     prediction TEXT
 )
 """)
-conn.commit()
+astro_conn.commit()
 
 API_URL = "https://aztro.sameerkumar.website"
 
@@ -559,7 +559,7 @@ async def horoscope(
             "INSERT INTO history (sign, day, prediction) VALUES (?, ?, ?)",
             (sign, day, prediction)
         )
-        conn.commit()
+        astro_conn.commit()
 
         return f"Horoscope for {sign} ({day}): {prediction}"
 
@@ -579,6 +579,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
