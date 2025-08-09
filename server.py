@@ -543,32 +543,32 @@ async def horoscope(
     """
     Get daily horoscope for a given sign and day from Aztro API.
     """
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                API_URL,
-                params={"sign": sign, "day": day}  # Aztro takes params in POST
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-        prediction = data.get("description", "No prediction available.")
-
-        # Save to DB
-        curs.execute(
-            "INSERT INTO history (sign, day, prediction) VALUES (?, ?, ?)",
-            (sign, day, prediction)
+    # try:
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            API_URL,
+            params={"sign": sign, "day": day}  # Aztro takes params in POST
         )
-        astro_conn.commit()
+        resp.raise_for_status()
+        data = resp.json()
 
-        return f"Horoscope for {sign} ({day}): {prediction}"
+    prediction = data.get("description", "No prediction available.")
 
-    except httpx.RequestError as e:
-        return f"Error connecting to Aztro API: {e}"
-    except httpx.HTTPStatusError as e:
-        return f"API returned error {e.response.status_code}: {e.response.text}"
-    except Exception as e:
-        return f"Unexpected error: {e}"
+    # Save to DB
+    curs.execute(
+        "INSERT INTO history (sign, day, prediction) VALUES (?, ?, ?)",
+        (sign, day, prediction)
+    )
+    astro_conn.commit()
+
+    return f"Horoscope for {sign} ({day}): {prediction}"
+
+    # except httpx.RequestError as e:
+    #     return f"Error connecting to Aztro API: {e}"
+    # except httpx.HTTPStatusError as e:
+    #     return f"API returned error {e.response.status_code}: {e.response.text}"
+    # except Exception as e:
+    #     return f"Unexpected error: {e}"
 
 
 
@@ -579,6 +579,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
