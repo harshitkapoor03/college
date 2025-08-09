@@ -405,14 +405,51 @@ from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
 from mcp.server.auth.provider import AccessToken
 from mcp import ErrorData, McpError
 from mcp.types import Field, TextContent, ImageContent, INTERNAL_ERROR
+# VALID_SIGNS = {
+#     "aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces"
+# }
+
+# @mcp.tool(description="Get daily horoscope. Usage: @horoscope sign=<aries> day=<today|yesterday|tomorrow>")
+# async def horoscope(
+#     sign: Annotated[str, Field(description="Zodiac sign e.g. aries")] = None,
+#     day: Annotated[str | None, Field(description="today|yesterday|tomorrow")] = "today",
+# ) -> str:
+#     if not sign:
+#         raise McpError(ErrorData(code=INTERNAL_ERROR, message="Please provide a zodiac sign (e.g. aries)."))
+#     sign_l = sign.strip().lower()
+#     if sign_l not in VALID_SIGNS:
+#         return f"❌ Unknown sign '{sign}'. Valid: {', '.join(sorted(VALID_SIGNS))}"
+
+#     params = {"sign": sign_l, "day": day or "today"}
+#     try:
+#         async with httpx.AsyncClient() as client:
+#             resp = await client.post("https://aztro.sameerkumar.website/", params=params, timeout=10)
+#             data = resp.json()
+#     except Exception as e:
+#         raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Horoscope fetch failed: {e}"))
+
+#     # Aztro response fields: description, mood, color, lucky_number, lucky_time, compatibility, current_date
+#     desc = data.get("description", "(no description)")
+#     mood = data.get("mood", "")
+#     color = data.get("color", "")
+#     lucky_num = data.get("lucky_number", "")
+#     lucky_time = data.get("lucky_time", "")
+#     date = data.get("current_date", "")
+
+#     return (f"🔮 Horoscope — {sign_l.capitalize()} — {date}\n\n"
+#             f"{desc}\n\n"
+#             f"• Mood: {mood}\n• Color: {color}\n• Lucky number: {lucky_num}\n• Lucky time: {lucky_time}")
+import httpx
+from mcp import McpError, ErrorData, INTERNAL_ERROR
+from mcp.types import Field
+
 VALID_SIGNS = {
     "aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces"
 }
 
-@mcp.tool(description="Get daily horoscope. Usage: @horoscope sign=<aries> day=<today|yesterday|tomorrow>")
+@mcp.tool(description="Get daily horoscope. Usage: @horoscope sign=<aries>")
 async def horoscope(
     sign: Annotated[str, Field(description="Zodiac sign e.g. aries")] = None,
-    day: Annotated[str | None, Field(description="today|yesterday|tomorrow")] = "today",
 ) -> str:
     if not sign:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message="Please provide a zodiac sign (e.g. aries)."))
@@ -420,25 +457,22 @@ async def horoscope(
     if sign_l not in VALID_SIGNS:
         return f"❌ Unknown sign '{sign}'. Valid: {', '.join(sorted(VALID_SIGNS))}"
 
-    params = {"sign": sign_l, "day": day or "today"}
+    url = f"https://horoscope-api.herokuapp.com/horoscope/today/{sign_l}"
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.post("https://aztro.sameerkumar.website/", params=params, timeout=10)
+            resp = await client.get(url, timeout=10)
+            resp.raise_for_status()
             data = resp.json()
     except Exception as e:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Horoscope fetch failed: {e}"))
 
-    # Aztro response fields: description, mood, color, lucky_number, lucky_time, compatibility, current_date
-    desc = data.get("description", "(no description)")
-    mood = data.get("mood", "")
-    color = data.get("color", "")
-    lucky_num = data.get("lucky_number", "")
-    lucky_time = data.get("lucky_time", "")
-    date = data.get("current_date", "")
+    description = data.get("horoscope", "(no description)")
+    date_range = data.get("date_range", "")
+    current_date = data.get("current_date", "") or ""
 
-    return (f"🔮 Horoscope — {sign_l.capitalize()} — {date}\n\n"
-            f"{desc}\n\n"
-            f"• Mood: {mood}\n• Color: {color}\n• Lucky number: {lucky_num}\n• Lucky time: {lucky_time}")
+    return (f"🔮 Horoscope — {sign_l.capitalize()} — {current_date}\n"
+            f"Date Range: {date_range}\n\n"
+            f"{description}")
 
 
 # --- Run server ---
@@ -448,6 +482,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
