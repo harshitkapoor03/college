@@ -187,9 +187,6 @@ from mcp.server.auth.provider import AccessToken
 from mcp.types import TextContent, ImageContent, INVALID_PARAMS, INTERNAL_ERROR
 from pydantic import BaseModel, Field, AnyUrl
 
-import markdownify
-import httpx
-import readabilipy
 
 # Extended imports allowed through MCP Image type and numpy usage in httpx environment
 import numpy as np
@@ -256,6 +253,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
