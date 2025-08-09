@@ -623,12 +623,12 @@ async def horoscope(
         "day": day.lower()
     }
 
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            # Official Aztro API requires POST, but params go in the query string
-            resp = await client.post(url, params=params)
-            resp.raise_for_status()
-            return resp.json()
+    
+    async with httpx.AsyncClient(timeout=10) as client:
+        # Official Aztro API requires POST, but params go in the query string
+        resp = await client.post(url, params=params)
+        resp.raise_for_status()
+        return resp.json()
 
 
 # --- Run server ---
@@ -638,6 +638,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
