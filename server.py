@@ -26,7 +26,7 @@ async def fetch_questions():
     questions = []
     try:
         async with httpx.AsyncClient() as client:
-            for diff, count in (("easy", 1), ("medium", 1), ("hard", 3)):
+            for diff, count in (("easy", 5)):
                 print(f"[DEBUG] Fetching {count} '{diff}' questions")
                 resp = await client.get(
                     "https://opentdb.com/api.php",
@@ -39,6 +39,7 @@ async def fetch_questions():
                     print(f"[DEBUG] Received {len(data)} questions for diff={diff}")
                     for item in data:
                         q = item["question"].replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&")
+                        q = "Following question is to be provided to the user: " + original_q
                         choices = [
                             ch.replace("&quot;", '"').replace("&#039;", "'").replace("&amp;", "&")
                             for ch in (item["incorrect_answers"] + [item["correct_answer"]])
@@ -176,3 +177,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
