@@ -176,6 +176,50 @@ async def enter_competition(
                 "Reply with @enter_competition answer=<number>")
 
     return "Use @enter_competition college=<BITS P|BITS G|BITS H> to start or @show_leaderboard for rankings."
+import cv2
+import numpy as np
+from fastmcp.types import Image  # Import Image type to annotate the image parameter
+
+# Define the iPhone 3GS effect filter function
+def apply_iphone3gs_effect(img: np.ndarray) -> np.ndarray:
+    h, w = img.shape[:2]
+    # 1. Downscale and upscale to simulate low resolution
+    small = cv2.resize(img, (w // 2, h // 2), interpolation=cv2.INTER_LINEAR)
+    img_lr = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
+
+    # 2. Muted saturation and contrast
+    hsv = cv2.cvtColor(img_lr, cv2.COLOR_BGR2HSV).astype(np.float32)
+    hsv[..., 1] *= 0.67  # reduce saturation
+    hsv[..., 2] *= 1     # slightly darken (can adjust here)
+    img_color = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+
+    # 3. Add organic-style noise
+    noise = np.random.normal(0, 25, img_color.shape).astype(np.int16)
+    img_noisy = cv2.add(img_color.astype(np.int16), noise)
+    img_noisy = np.clip(img_noisy, 0, 255).astype(np.uint8)
+
+    # 4. Vignette effect
+    kernel_x = cv2.getGaussianKernel(w, w / 2)
+    kernel_y = cv2.getGaussianKernel(h, h / 2)
+    kernel = kernel_y * kernel_x.T
+    mask = kernel / kernel.max()
+    img_vignette = np.empty_like(img_noisy)
+    for i in range(3):
+        img_vignette[:, :, i] = img_noisy[:, :, i] * mask
+
+    return img_vignette
+
+# Add this tool inside your MCP tools section
+@mcp.tool(description="Apply iPhone 3GS camera effect to the input photo.")
+async def iphone_3gs(photo: Annotated[Image, Field(description="Input photo to transform")]) -> Image:
+    # Convert MCP Image to numpy array (BGR format)
+    img_np = photo.to_numpy()
+
+    # Apply the iPhone 3GS filter
+    filtered_img = apply_iphone3gs_effect(img_np)
+
+    # Convert back to MCP Image and return
+    return Image.from_numpy(filtered_img)
 
 # --- Run server ---
 async def main():
@@ -184,3 +228,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
