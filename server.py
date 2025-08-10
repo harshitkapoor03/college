@@ -6,9 +6,7 @@ from typing import Annotated
 from fastmcp import FastMCP
 from mcp.types import Field
 
-@mcp.tool
-async def validate() -> str:
-    return "917044607962"
+
 # # --- DB Setup ---
 # conn = sqlite3.connect("leaderboard.db", check_same_thread=False)
 # cur = conn.cursor()
@@ -93,6 +91,9 @@ class SimpleBearerAuthProvider(BearerAuthProvider):
         return None
 
 mcp = FastMCP("College Quiz MCP Server", auth=SimpleBearerAuthProvider(TOKEN))
+@mcp.tool
+async def validate() -> str:
+    return MY_NUMBER
 
 # # --- Tools ---
 # @mcp.tool(description="Show current leaderboard standings.")
@@ -823,6 +824,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
