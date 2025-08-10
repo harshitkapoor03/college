@@ -912,7 +912,7 @@ async def crypto_time_series(
     coin_id: Annotated[str, Field(description="CoinGecko coin ID, e.g., 'bitcoin', 'ethereum', 'solana'")],
     currency: Annotated[str, Field(description="Target currency, e.g., 'usd', 'inr'")] = "inr",
     period_hours: Annotated[int, Field(description="How many past hours to fetch")] = 10,
-    interval: Annotated[str, Field(description="Data interval: 'minute' or 'hour'")] = "minute",
+    interval: Annotated[str, Field(description="Data interval: 'minute' or 'hour'")] = "hour",
 ) -> list:
     """
     Returns:
@@ -1166,6 +1166,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
