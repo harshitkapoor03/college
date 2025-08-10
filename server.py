@@ -898,6 +898,147 @@ async def crypto_last_10h(
 
     except Exception as e:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
+#####______________________________________________________________________________________________________________________________________________
+
+import base64
+import io
+import datetime
+from typing import Annotated
+
+import yfinance as yf
+import matplotlib.pyplot as plt
+
+# you may already have these in your environment from fastmcp/mcp types
+# from fastmcp import mcp
+# from mcp.types import Field, TextContent, ImageContent, ErrorData, McpError, INTERNAL_ERROR
+
+@mcp.tool(description="Fetch stock time series (period+interval), generate table + chart (times converted to IST).")
+async def stock_time_series(
+    stock_symbol: Annotated[str, Field(description="Stock symbol without exchange, e.g. RELIANCE")],
+    exchange: Annotated[str, Field(description="Exchange suffix, e.g. 'NS' for NSE or 'BO' for BSE")] = "NS",
+    period: Annotated[str, Field(description="Data period, e.g. '1d','5d','60d','1mo','3mo'")] = "2d",
+    interval: Annotated[str, Field(description="Data interval, e.g. '1m','5m','15m','30m','1h','1d'")] = "1h",
+    # currency: Annotated[str, Field(description="Currency label for display, e.g. 'INR' or 'USD'")] = "INR",
+) -> list:
+    """
+    Returns:
+      - TextContent: a formatted table of timestamps (IST) and Close prices + % change
+      - ImageContent: PNG chart encoded base64
+    """
+    currency="INR"
+    try:
+        # Build ticker symbol
+        full_symbol = f"{stock_symbol}.{exchange}"
+        
+        # Fetch data
+        ticker = yf.Ticker(full_symbol)
+        data = ticker.history(period=period, interval=interval)
+
+        if data.empty:
+            raise McpError(ErrorData(
+                code=INTERNAL_ERROR,
+                message=f"No data found for {full_symbol} with period={period}, interval={interval}"
+            ))
+
+        # Prepare times (convert to IST by adding offset)
+        ist_offset = datetime.timedelta(hours=5, minutes=30)
+        # Some indexes are tz-aware; convert to naive UTC first then add offset safely
+        times_dt = []
+        for idx in data.index:
+            # idx might be a pandas Timestamp (tz-aware or naive)
+            try:
+                # convert to naive UTC datetime
+                ts_utc = idx.tz_convert('UTC').to_pydatetime() if getattr(idx, "tz", None) else idx.to_pydatetime()
+            except Exception:
+                # fallback if idx is plain datetime
+                ts_utc = idx.to_pydatetime() if hasattr(idx, "to_pydatetime") else idx
+            times_dt.append(ts_utc + ist_offset)
+
+        # Prices (use Close)
+        prices = data['Close'].tolist()
+
+        # Format times for display
+        times_str = [dt.strftime("%d-%b %I:%M %p") for dt in times_dt]
+
+        # Compute percent change (first -> last)
+        if len(prices) >= 2:
+            start_price = prices[0]
+            end_price = prices[-1]
+            percent_change = ((end_price - start_price) / start_price) * 100
+        else:
+            percent_change = 0.0
+
+        # Prepare x-axis ticks up to 20 labels evenly spaced
+        max_labels = 20
+        n = len(times_str)
+        if n > max_labels:
+            step = max(1, n // max_labels)
+            x_ticks = list(range(0, n, step))
+            # ensure last tick is included
+            if x_ticks[-1] != n - 1:
+                x_ticks.append(n - 1)
+        else:
+            x_ticks = list(range(n))
+
+        # Plot chart (only plotting the available points)
+        plt.figure(figsize=(10, 5))
+        color = "green" if percent_change >= 0 else "red"
+        plt.plot(times_str, prices, marker='o', color=color, linewidth=1.5, markersize=4)
+        plt.xticks(x_ticks, [times_str[i] for i in x_ticks], rotation=45, ha='right')
+        plt.title(f"{stock_symbol.upper()} ({exchange}) Price\nPeriod: {period} | Interval: {interval} | Change: {percent_change:+.2f}%")
+        plt.xlabel("Time (IST)")
+        plt.ylabel(f"Price ({currency.upper()})")
+        plt.grid(True, alpha=0.25)
+        plt.tight_layout()
+
+        # Save to buffer
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", dpi=200, bbox_inches='tight')
+        plt.close()
+        buf.seek(0)
+        img_b64 = base64.b64encode(buf.read()).decode("utf-8")
+
+        # Build text table (optionally limit rows if huge — here we include all)
+        table_lines = [
+            f"{stock_symbol.upper()} ({exchange}) Prices — Period: {period}, Interval: {interval}",
+            "=" * 60
+        ]
+        for t, p in zip(times_str, prices):
+            table_lines.append(f"{t}  ->  {currency.upper()} {p:,.2f}")
+        table_lines.append("=" * 60)
+        table_lines.append(f"Percentage Change: {percent_change:+.2f}%")
+        table_lines.append(f"Total Data Points: {len(prices)}")
+
+        # Optional company info (best-effort)
+        try:
+            info = ticker.info
+            if info:
+                long_name = info.get("longName") or info.get("shortName")
+                if long_name:
+                    table_lines.append("")
+                    table_lines.append(f"Company: {long_name}")
+                sector = info.get("sector")
+                if sector:
+                    table_lines.append(f"Sector: {sector}")
+                market_cap = info.get("marketCap")
+                if market_cap:
+                    table_lines.append(f"Market Cap: {market_cap:,}")
+        except Exception:
+            # ignore metadata errors
+            pass
+
+        table_text = "\n".join(table_lines)
+
+        return [
+            TextContent(type="text", text=table_text),
+            ImageContent(type="image", mimeType="image/png", data=img_b64)
+        ]
+
+    except McpError:
+        # re-raise MCP errors as-is
+        raise
+    except Exception as e:
+        raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
 # --- Run server ---
 async def main():
@@ -906,6 +1047,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
