@@ -6,6 +6,9 @@ from typing import Annotated
 from fastmcp import FastMCP
 from mcp.types import Field
 
+@mcp.tool
+async def validate() -> str:
+    return "917044607962"
 # # --- DB Setup ---
 # conn = sqlite3.connect("leaderboard.db", check_same_thread=False)
 # cur = conn.cursor()
@@ -820,6 +823,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
