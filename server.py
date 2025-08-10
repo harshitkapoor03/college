@@ -724,11 +724,13 @@ async def fetch_trivia(
         response = requests.get("https://opentdb.com/api.php?amount=1&difficulty=medium&type=multiple")
         response.raise_for_status()
         questions = response.json().get("results", [])
+        cans=questions["correct answer"}
+        q=questions["question"]
         # user_data = _get_user_data(puch_user_id)
         # user_data['questions'] = questions
         # user_data['current_question'] = 0
         # user_data['score'] = 0
-        return [TextContent(type="text", text=json.dumps(questions))]
+        return [q+cans]
     except Exception as e:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
@@ -815,6 +817,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
