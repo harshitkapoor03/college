@@ -823,21 +823,15 @@ import requests
 import time
 import datetime
 import matplotlib.pyplot as plt
-import os
+import base64
 from typing import Annotated
-from mcp.types import TextContent, BlobContent
-from fastmcp import FastMCP
-from mcp import ErrorData, McpError
-from mcp.types import INTERNAL_ERROR
+from mcp.types import TextContent, ImageContent
 from pydantic import Field
-
-# Example: keep your MCP instance from before
-# mcp = FastMCP("Crypto Tracker Server", auth=...)
 
 @mcp.tool(description="Fetch last 10 hours of price data for a crypto token and generate a chart.")
 async def crypto_last_10h(
     token_id: Annotated[str, Field(description="The CoinGecko token ID (e.g., 'bitcoin', 'dogecoin')")],
-    currency: Annotated[str, Field(description="Currency for prices, e.g., 'usd', 'inr'")] = "usd"
+    currency: Annotated[str, Field(description="Currency for prices, e.g., 'usd', 'inr")] = "usd"
 ) -> list:
     try:
         now = int(time.time())
@@ -854,15 +848,12 @@ async def crypto_last_10h(
         res.raise_for_status()
         data = res.json()
 
-        # Extract timestamps & prices
         timestamps = [p[0] / 1000 for p in data["prices"]]
         prices = [p[1] for p in data["prices"]]
 
-        # IST offset
         offset = datetime.timedelta(hours=5, minutes=30)
         times = [datetime.datetime.fromtimestamp(ts) + offset for ts in timestamps]
 
-        # Filter to one per hour
         hourly_times, hourly_prices, seen_hours = [], [], set()
         for t, price in zip(times, prices):
             hour_key = t.replace(minute=0, second=0, microsecond=0)
@@ -871,7 +862,6 @@ async def crypto_last_10h(
                 hourly_times.append(hour_key.strftime("%I:%M %p"))
                 hourly_prices.append(price)
 
-        # % change
         if len(hourly_prices) >= 2:
             start_price = hourly_prices[0]
             end_price = hourly_prices[-1]
@@ -879,7 +869,7 @@ async def crypto_last_10h(
         else:
             percent_change = 0
 
-        # Plot
+        # Save chart as PNG
         chart_path = f"/tmp/{token_id}_last_10h.png"
         plt.plot(hourly_times, hourly_prices, marker='o', color='blue')
         plt.xticks(rotation=45)
@@ -891,16 +881,19 @@ async def crypto_last_10h(
         plt.savefig(chart_path)
         plt.close()
 
-        # Prepare table text
+        # Encode PNG to base64
+        with open(chart_path, "rb") as f:
+            img_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+        # Build text table
         table_text = "\nHourly Prices (Last 10 Hours):\n"
         for t_str, price in zip(hourly_times, hourly_prices):
             table_text += f"{t_str}  ->  {currency.upper()} {price:,.2f}\n"
         table_text += f"\nPercentage Change: {percent_change:+.2f}%"
 
-        # Return both table and chart
         return [
             TextContent(type="text", text=table_text),
-            BlobContent(type="image/png", data=open(chart_path, "rb").read())
+            ImageContent(type="image/png", data=img_b64)
         ]
 
     except Exception as e:
@@ -913,6 +906,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
