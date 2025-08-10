@@ -747,7 +747,7 @@ async def answer_question(
     try:
         user_data = _get_user_data(puch_user_id)
         questions = user_data.get('questions', [])
-        current_question = user_data.get('current_question', 0)
+        current_question = user_data.get('current_question', 1)
         
         if current_question >= len(questions):
             return [TextContent(type="text", text="No more questions available.")]
@@ -812,7 +812,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
 
 
 
