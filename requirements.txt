@@ -8,3 +8,6 @@ numpy
 Pillow
 
 
+cryptography>=41.0.0
+beautifulsoup4>=4.12.0
+markdownify>=0.11.6
