@@ -943,16 +943,13 @@ async def stock_time_series(
         # Prepare times (convert to IST by adding offset)
         ist_offset = datetime.timedelta(hours=5, minutes=30)
         # Some indexes are tz-aware; convert to naive UTC first then add offset safely
-        times_dt = []
-        for idx in data.index:
-            # idx might be a pandas Timestamp (tz-aware or naive)
-            try:
-                # convert to naive UTC datetime
-                ts_utc = idx.tz_convert('UTC').to_pydatetime() if getattr(idx, "tz", None) else idx.to_pydatetime()
-            except Exception:
-                # fallback if idx is plain datetime
-                ts_utc = idx.to_pydatetime() if hasattr(idx, "to_pydatetime") else idx
-            times_dt.append(ts_utc + ist_offset)
+      
+        
+        times_dt = [idx.to_pydatetime() for idx in data.index]
+        
+        # Format times for display
+        times_str = [dt.strftime("%d-%b %I:%M %p") for dt in times_dt]
+
 
         # Prices (use Close)
         prices = data['Close'].tolist()
@@ -1047,6 +1044,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
