@@ -819,51 +819,7 @@ async def fetch_trivia(
 #         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
 #------------------------------------------------------------------$------------------------------------------------------------------------------Resume tool-----------------
-import base64
-import io
-from PIL import Image, ImageEnhance, ImageFilter
-import numpy as np
-import httpx
-import pytesseract
-import re
-@mcp.tool(description="extract keywords to be focused on resume from resume picture and job description (provided through text)")
-async def resume_keywords(
-    job_description: Annotated[str, Field(description="Job description text")],
-    resume_image: Annotated[str, Field(description="Base64-encoded image data to transform")] = None,
-    
 
-    
-) -> list[TextContent]:
-
-
-    try:
-       
-       
-
-
-        if resume_image.startswith("data:image"):
-            resume_image = re.sub(r"^data:image\/[a-zA-Z]+;base64,", "", resume_image)
-        
-        try:
-            image_bytes = base64.b64decode(resume_image)
-            image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        except Exception as img_err:
-            raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Invalid image data: {img_err}"))
-
-        # image_bytes = base64.b64decode(resume_image)
-        # image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        text = pytesseract.image_to_string(image)
-        jd_keywords = set(job_description.lower().split())
-        resume_keywords = set(text.lower().split())
-        missing_keywords = jd_keywords - resume_keywords
-
-        suggestions = {
-            "missing_keywords": list(missing_keywords),
-            "suggestions": "Consider including these keywords in your resume to better match the job description."
-        }
-        return [TextContent(type="text", text=json.dumps(suggestions))]
-    except Exception as e:
-        raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 # --- Run server ---
 async def main():
     print("🚀 Starting MCP server on http://0.0.0.0:8086")
@@ -871,6 +827,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
