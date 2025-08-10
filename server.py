@@ -715,7 +715,7 @@ def _error(code, msg):
 
 # Fetch questions from Open Trivia Database
 FetchQuestionsDescription = RichToolDescription(
-    description="Fetches 1 medium multiple-choice questions for THE USER from Open Trivia Database and gives to users with options then the user will reply and compare it to the correct answer returned by this tool.",
+    description="Fetches one exciting trivia multiple-choice question for the user from the Open Trivia Database!",
     use_when="When a new quiz session is started or user asks for trivia questions or to enter a quiz.",
     side_effects="None",
 )
@@ -827,8 +827,9 @@ import httpx
 import pytesseract
 @mcp.tool(description="extract keywords to be focused on resume from resume picture and job description (provided through text)")
 async def resume_keywords(
-    resume_image: Annotated[str, Field(description="Base64-encoded image data to transform")] = None,
     job_description: Annotated[str, Field(description="Job description text")],
+    resume_image: Annotated[str, Field(description="Base64-encoded image data to transform")] = None,
+    
 
     
 ) -> list[TextContent]:
@@ -857,6 +858,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
