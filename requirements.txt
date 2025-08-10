@@ -6,8 +6,13 @@ pydantic==2.11.7
 python-dotenv==1.1.1
 numpy
 Pillow
-
-
 cryptography>=41.0.0
 beautifulsoup4>=4.12.0
 markdownify>=0.11.6
+
+
+twilio>=7.18.0
+requests>=2.31.0
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.8
+unsplash-python>=1.1.0
