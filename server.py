@@ -188,6 +188,12 @@ async def crypto_time_series(
         else:
             filtered_times = [t.strftime("%d-%b %I:%M %p") for t in times]
             filtered_prices = prices
+        last_actual_time = times[-1].strftime("%d-%b %I:%M %p")
+        last_actual_price = prices[-1]
+        
+        if last_actual_time != filtered_times[-1]:
+            filtered_times.append(last_actual_time)
+            filtered_prices.append(last_actual_price)
 
         # Compute percent change
         start_price = filtered_prices[0]
@@ -234,6 +240,10 @@ async def crypto_time_series(
         table_lines.append("=" * 60)
         table_lines.append(f"Percentage Change: {percent_change:+.4f}%")
         table_lines.append(f"Total Data Points: {len(filtered_prices)}")
+        # # Add latest price row
+        # latest_time = filtered_times[-1]
+        # latest_price = filtered_prices[-1]
+        # table_lines.append(f"Latest Price ({latest_time}): {currency.upper()} {latest_price:,.4f}")
 
         table_text = "\n".join(table_lines)
 
@@ -497,6 +507,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
