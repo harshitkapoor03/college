@@ -827,10 +827,11 @@ import httpx
 import pytesseract
 @mcp.tool(description="extract keywords to be focused on resume from resume picture and job description (provided through text)")
 async def resume_keywords(
+    resume_image: Annotated[str, Field(description="Base64-encoded image data to transform")] = None,
     job_description: Annotated[str, Field(description="Job description text")],
-    resume_image: Annotated[str, Field(description="Base64-encoded image data to transform")] =None
+
     
-) -> list[TextContent | ImageContent]:
+) -> list[TextContent]:
 
 
     try:
@@ -856,6 +857,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
