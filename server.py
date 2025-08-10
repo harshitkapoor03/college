@@ -711,9 +711,9 @@ def _error(code, msg):
 
 # Fetch questions from Open Trivia Database
 FetchQuestionsDescription = RichToolDescription(
-    description="Fetches 1 medium multiple-choice questions for THE USER from Open Trivia Database and gives to users with options then the user will reply and compare it to the correct answer returned by this tool.",
+    description="Fetches 1 medium multiple-choice questions for THE USER from Open Trivia Database and gives to users with options then the user will reply , then the puchai client will compare user entered answer to the answer returned by this tool and replies whether the user got it correct or wrong.",
     use_when="When a new quiz session is started or user asks for trivia questions or to enter a quiz.",
-    side_effects="None",
+    side_effects="post this tool is run, puchai client has to analyse what the user answers  to the provided question and compare user entered answer to the answer returned by this tool and reply whether the user got it correct or wrong ",
 )
 
 @mcp.tool(description=FetchQuestionsDescription.model_dump_json())
@@ -820,6 +820,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
