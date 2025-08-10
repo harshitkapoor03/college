@@ -837,7 +837,7 @@ from pydantic import Field
 @mcp.tool(description="Fetch last 10 hours of price data for a crypto token and generate a chart.")
 async def crypto_last_10h(
     token_id: Annotated[str, Field(description="The CoinGecko token ID (e.g., 'bitcoin', 'dogecoin')")],
-    currency: Annotated[str, Field(description="Currency for prices, e.g., 'usd', 'inr')] = "usd"
+    currency: Annotated[str, Field(description="Currency for prices, e.g., 'usd', 'inr'")] = "usd"
 ) -> list:
     try:
         now = int(time.time())
@@ -913,6 +913,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
