@@ -134,8 +134,8 @@ import matplotlib.pyplot as plt
 # from fastmcp import mcp
 # from mcp.types import Field, TextContent, ImageContent, ErrorData, McpError, INTERNAL_ERROR
 
-@mcp.tool(description="- Fetch historical cryptocurrency prices from CoinGecko for a given coin, currency, time period, and interval (minute or hour -ONLY);\n-Returns a formatted price table, percentage change, and an IST-based time series chart.\n eg) Just ask for bitcoin's price in the last 10 hours\n ")
-async def crypto_time_series(
+@mcp.tool(description="-Fetch historical crypto prices from CoinGecko by coin, currency, period, and interval (minute/hour) \neg) Bitcoin price in INR for last 10 hours")
+async def crypto_time_series( 
     coin_id: Annotated[str, Field(description="CoinGecko coin ID, e.g., 'bitcoin', 'ethereum', 'solana'")],
     currency: Annotated[str, Field(description="Target currency, e.g., 'usd', 'inr'")] = "inr",
     period_hours: Annotated[int, Field(description="How many past hours to fetch")] = 10,
@@ -259,7 +259,7 @@ import yfinance as yf
 import matplotlib.pyplot as plt
 
 
-@mcp.tool(description="-Fetch historical stock prices for a specified symbol, exchange, period, and interval; \n-Returns a formatted price table, percentage change, and an IST-based time series chart.\n-You can include stock symbols like SBIN (State Bank of India),INFY (Infosys Limited) and NSE/BSE for extra accurate results.\n eg) TCS stock  price for last 3 days (include special yitime interval mins/hour if needed)")
+@mcp.tool(description="-Fetch historical stock prices by symbol, exchange, period, and time interval\neg) SBIN stock price in NSE for last 3 days with time interval of 1 hour")
 async def stock_time_series(
     stock_symbol: Annotated[str, Field(description="Stock symbol without exchange, e.g. RELIANCE,360ONE, 3MINDIA, ABB, ACC, AIAENG, APLAPOLLO, AUBANK, AARTIIND, AAVAS, ABBOTINDIA,ACE, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ATGL, AWL, ABCAPITAL, ABFRL,AEGISLOG, AETHER, AFFLE, AJANTPHARM, APLLTD, ALKEM, ALKYLAMINE, ALLCARGO, ALOKINDS, ARE&M,AMBER, AMBUJACEM, ANANDRATHI, ANGELONE, ANURAS, APARINDS, APOLLOHOSP, APOLLOTYRE, APTUS, ACI,ASAHIINDIA, ASHOKLEY, ASIANPAINT, ASTERDM, ASTRAZEN, ASTRAL, ATUL, AUROPHARMA, AVANTIFEED, DMART,AXISBANK, BEML, BLS, BSE, BAJAJ-AUTO, BAJFINANCE, BAJAJFINSV, BAJAJHLDNG, BALAMINES, BALKRISIND,BALRAMCHIN, BANDHANBNK, BANKBARODA, BANKINDIA, MAHABANK, BATAINDIA, BAYERCROP, BERGEPAINT, BDL, BEL,BHARATFORG, BHEL, BPCL, BHARTIARTL, BIKAJI, BIOCON, BIRLACORPN, BSOFT, BLUEDART, BLUESTARCO,BBTC, BORORENEW, BOSCHLTD, BRIGADE, BRITANNIA, MAPMYINDIA, CCL, CESC, CGPOWER, CIEINDIA,CRISIL, CSBBANK, CAMPUS, CANFINHOME, CANBK, CAPLIPOINT, CGCL, CARBORUNIV, CASTROLIND, CEATLTD,CELLO, CENTRALBK, CDSL, CENTURYPLY, ABREL, CERA, CHALET, CHAMBLFERT, CHEMPLASTS, CHENNPETRO,CHOLAHLDNG, CHOLAFIN, CIPLA, CUB, CLEAN, COALINDIA, COCHINSHIP, COFORGE, COLPAL, CAMS,CONCORDBIO, CONCOR, COROMANDEL, CRAFTSMAN, CREDITACC, CROMPTON, CUMMINSIND, CYIENT, DCMSHRIRAM, DLF,DOMS, DABUR, DALBHARAT, DATAPATTNS, DEEPAKFERT, DEEPAKNTR, DELHIVERY, DEVYANI, DIVISLAB, DIXON,LALPATHLAB, DRREDDY, EIDPARRY, EIHOTEL, EPL, EASEMYTRIP, EICHERMOT, ELECON, ELGIEQUIP, EMAMILTD,ENDURANCE, ENGINERSIN, EQUITASBNK, ERIS, ESCORTS, EXIDEIND, FDC, NYKAA, FEDERALBNK, FACT,FINEORG, FINCABLES, FINPIPE, FSL, FIVESTAR, FORTIS, GAIL, GMMPFAUDLR, GMRINFRASTRUCT, GRSE,GICRE, GILLETTE, GLAND, GLAXO, ALIVUS, GLENMARK, MEDANTA, GPIL, GODFRYPHLP, GODREJCP,GODREJIND, GODREJPROP, GRANULES, GRAPHITE, GRASIM, GESHIP, GRINDWELL, GAEL, FLUOROCHEM, GUJGASLTD,GMDCLTD, GNFC, GPPL, GSFC, GSPL, HEG, HBLENGINE, HCLTECH, HDFCAMC, HDFCBANK,HDFCLIFE, HFCL, HAPPSTMNDS, HAPPYFORGE, HAVELLS, HEROMOTOCO, HSCL, HINDALCO, HAL, HINDCOPPER,HINDPETRO, HINDUNILVR, HINDZINC, POWERINDIA, HOMEFIRST, HONASA, HONAUT, HUDCO, ICICIBANK, ICICIGI,ICICIPRULI, ISEC, IDBI, IDFCFIRSTB, IFCI, IIFL, IRB, IRCON, ITC, ITI,INDIACEM, INDIAMART, INDIANB, IEX, INDHOTEL, IOC, IOB, IRCTC, IRFC, INDIGOPNTS,IGL, INDUSTOWER, INDUSINDBK, NAUKRI, INFY, INOXWIND, INTELLECT, INDIGO, IPCALAB, JBCHEPHARM,JKCEMENT, JBMA, JKLAKSHMI, JKPAPER, JMFINANCIL, JSWENERGY, JSWINFRA, JSWSTEEL, JAIBALAJI, J&KBANK,JINDALSAW, JSL, JINDALSTEL, JIOFIN, JUBLFOOD, JUBLINGREA, JUBLPHARMA, JWL, JUSTDIAL, JYOTHYLAB,KPRMILL, KEI, KNRCON, KPITTECH, KRBL, KSB, KAJARIACER, KPIL, KALYANKJIL, KANSAINER,KARURVYSYA, KAYNES, KEC, KFINTECH, KOTAKBANK, KIMS, LTF, LTTS, LICHSGFIN, LTIM,LT, LATENTVIEW, LAURUSLABS, LXCHEM, LEMONTREE, LICI, LINDEINDIA, LLOYDSME, LUPIN, MMTC,MRF, MTARTECH, LODHA, MGL, MAHSEAMLES, M&MFIN, M&M, MHRIL, MAHLIFE, MANAPPURAM,MRPL, MANKIND, MARICO, MARUTI, MASTEK, MFSL, MAXHEALTH, MAZDOCK, MEDPLUS, METROBRAND,METROPOLIS, MINDACORP, MSUMI, MOTILALOFS, MPHASIS, MCX, MUTHOOTFIN, NATCOPHARM, NBCC, NCC,NHPC, NLCINDIA, NMDC, NSLNISP, NTPC, NH, NATIONALUM, NAVINFLUOR, NESTLEIND, NETWORK18,NAM-INDIA, NUVAMA, NUVOCO, OBEROIRLTY, ONGC, OIL, OLECTRA, PAYTM, OFSS, POLICYBZR,PCBL, PIIND, PNBHOUSING, PNCINFRA, PVRINOX, PAGEIND, PATANJALI, PERSISTENT, PETRONET, PHOENIXLTD,PIDILITIND, PEL, PPLPHARMA, POLYMED, POLYCAB, POONAWALLA, PFC, POWERGRID, PRAJIND, PRESTIGE,PRINCEPIPE, PRSMJOHNSN, PGHH, PNB, QUESS, RRKABEL, RBLBANK, RECLTD, RHIM, RITES,RADICO, RVNL, RAILTEL, RAINBOW, RAJESHEXPO, RKFORGE, RCF, RATNAMANI, RTNINDIA, RAYMOND,REDINGTON, RELIANCE, RBA, ROUTE, SBFC, SBICARD, SBILIFE, SJVN, SKFINDIA, SRF,SAFARI, SAMMAANCAP, MOTHERSON, SANOFI, SAPPHIRE, SAREGAMA, SCHAEFFLER, SCHNEIDER, SHREECEM, RENUKA,SHRIRAMFIN, SHYAMMETL, SIEMENS, SIGNATURE, SOBHA, SOLARINDS, SONACOMS, SONATSOFTW, STARHEALTH, SBIN,SAIL, SWSOLAR, STLTECH, SUMICHEM, SPARC, SUNPHARMA, SUNTV, SUNDARMFIN, SUNDRMFAST, SUNTECK,SUPREMEIND, SUVENPHAR, SUZLON, SWANENERGY, SYNGENE, SYRMA, TBOTEK, TVSMOTOR, TVSSCS, TMB,TANLA, TATACHEM, TATACOMM, TCS, TATACONSUM, TATAELXSI, TATAINVEST, TATAMOTORS, TATAPOWER, TATASTEEL,TATATECH, TTML, TECHM, TEJASNET, NIACL, RAMCOCEM, THERMAX, TIMKEN, TITAGARH, TITAN,TORNTPHARM, TORNTPOWER, TRENT, TRIDENT, TRIVENI, TRITURBINE, TIINDIA, UCOBANK, UNOMINDA, UPL,UTIAMC, UJJIVANSFB, ULTRACEMCO, UNIONBANK, UBL, UNITDSPR, USHAMART, VGUARD, VIPIND, VAIBHAVGBL,VTL, VARROC, VBL, MANYAVAR, VEDL, VIJAYA, IDEA, VOLTAS, WELCORP, WELSPUNLIV,WESTLIFE, WHIRLPOOL, WIPRO, YESBANK, ZFCVINDIA, ZEEL, ZENSARTECH, ETERNAL, ZYDUSLIFE, ECLERX")],
     exchange: Annotated[str, Field(description="Exchange suffix, e.g. 'NS' for NSE or 'BO' for BSE")] = "NS",
@@ -384,7 +384,7 @@ async def stock_time_series(
     except Exception as e:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
-@mcp.tool(description="- Apply retro iPhone 3GS vintage style filter to your photo and travel back to 505! (2009).\neg) Apply retro filter <attach picture>")
+@mcp.tool(description="-Apply retro iPhone 3GS vintage style filter to your photo and travel back to 505! (2009).\neg) Apply retro filter <attach picture>")
 async def vintage_photo_filter(
     puch_image_data: Annotated[str, Field(description="Base64-encoded image data to transform")] = None,
 ) -> list[TextContent | ImageContent]:
@@ -459,7 +459,7 @@ async def vintage_photo_filter(
     except Exception as e:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
     
-@mcp.tool(description="- Start your day with your daily horoscope!\n eg) What is my horoscope for today, I'm a Libra")
+@mcp.tool(description="- Start your day with your daily horoscope!\n eg) What is my horoscope for today, I'm a Libra\n\nPro Tip: use /reset if you ever feel it is  hallucinating")
 async def horoscope(
     sign: Annotated[str, Field(description="Zodiac sign (e.g., 'aries', 'leo')")],
     #lang: Annotated[str, Field(description="Language code (e.g., 'en')")] = "en",
@@ -497,6 +497,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
