@@ -633,6 +633,7 @@ async def horoscope(
         "type": type_,
         "timezone": timezone
     }
+    data="uunavailable rn"
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.get(API_URL, headers=headers, params=params)
@@ -682,6 +683,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
