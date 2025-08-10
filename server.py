@@ -905,7 +905,7 @@ import io
 import base64
 import matplotlib.pyplot as plt
 from typing import Annotated
-from fastmcp import mcp, Field, TextContent, ImageContent, McpError, ErrorData, INTERNAL_ERROR
+from fastmcp import Field, TextContent, ImageContent, McpError, ErrorData, INTERNAL_ERROR
 
 @mcp.tool(description="Fetch historical cryptocurrency prices from CoinGecko for a given coin, currency, time period, and interval; returns a formatted price table, percentage change, and an IST-based time series chart.")
 async def crypto_time_series(
@@ -1166,6 +1166,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
