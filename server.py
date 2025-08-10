@@ -825,6 +825,7 @@ from PIL import Image, ImageEnhance, ImageFilter
 import numpy as np
 import httpx
 import pytesseract
+import re
 @mcp.tool(description="extract keywords to be focused on resume from resume picture and job description (provided through text)")
 async def resume_keywords(
     job_description: Annotated[str, Field(description="Job description text")],
@@ -836,9 +837,21 @@ async def resume_keywords(
 
 
     try:
-        # Decode base64 input
-        image_bytes = base64.b64decode(resume_image)
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+       
+       
+
+
+        if resume_image.startswith("data:image"):
+            resume_image = re.sub(r"^data:image\/[a-zA-Z]+;base64,", "", resume_image)
+        
+        try:
+            image_bytes = base64.b64decode(resume_image)
+            image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        except Exception as img_err:
+            raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Invalid image data: {img_err}"))
+
+        # image_bytes = base64.b64decode(resume_image)
+        # image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         text = pytesseract.image_to_string(image)
         jd_keywords = set(job_description.lower().split())
         resume_keywords = set(text.lower().split())
@@ -858,6 +871,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
