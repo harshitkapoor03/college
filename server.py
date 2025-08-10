@@ -1003,9 +1003,9 @@ async def crypto_time_series(
             "=" * 60
         ]
         for t, p in zip(filtered_times, filtered_prices):
-            table_lines.append(f"{t}  ->  {currency.upper()} {p:,.2f}")
+            table_lines.append(f"{t}  ->  {currency.upper()} {p:,.4f}")
         table_lines.append("=" * 60)
-        table_lines.append(f"Percentage Change: {percent_change:+.2f}%")
+        table_lines.append(f"Percentage Change: {percent_change:+.4f}%")
         table_lines.append(f"Total Data Points: {len(filtered_prices)}")
 
         table_text = "\n".join(table_lines)
@@ -1166,6 +1166,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
