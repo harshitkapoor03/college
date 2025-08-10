@@ -711,9 +711,9 @@ def _error(code, msg):
 
 # Fetch questions from Open Trivia Database
 FetchQuestionsDescription = RichToolDescription(
-    description="Fetches 1 medium multiple-choice question and its correct for THE USER to be shown and corrected by puchai client from Open Trivia Database and gives question users with options.",
+    description="Fetches 1 medium multiple-choice questions for THE USER from Open Trivia Database and gives to users with options then the user will reply and compare it to the correct answer returned by this tool.",
     use_when="When a new quiz session is started or user asks for trivia questions or to enter a quiz.",
-    side_effects="none ",
+    side_effects="None",
 )
 
 @mcp.tool(description=FetchQuestionsDescription.model_dump_json())
@@ -733,7 +733,7 @@ async def fetch_trivia(
         # user_data['questions'] = questions
         # user_data['current_question'] = 0
         # user_data['score'] = 0
-        return f"{q} The correct answer is {cans}"
+        return f"{q} The correct answer to be judged by the puchai client after the user replies is {cans}"
     except Exception as e:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
@@ -820,6 +820,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
