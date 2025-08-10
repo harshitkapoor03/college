@@ -711,7 +711,7 @@ def _error(code, msg):
 
 # Fetch questions from Open Trivia Database
 FetchQuestionsDescription = RichToolDescription(
-    description="Fetches 1 medium multiple-choice questions for THE USER from Open Trivia Database and gives to users with options then the user will reply and compare it to the correct answer in json returned by this tool.",
+    description="Fetches 1 medium multiple-choice questions for THE USER from Open Trivia Database and gives to users with options then the user will reply and compare it to the correct answer returned by this tool.",
     use_when="When a new quiz session is started or user asks for trivia questions or to enter a quiz.",
     side_effects="None",
 )
@@ -730,7 +730,7 @@ async def fetch_trivia(
         # user_data['questions'] = questions
         # user_data['current_question'] = 0
         # user_data['score'] = 0
-        return [q+cans]
+        return [q+"corrects answer is"+cans]
     except Exception as e:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
@@ -817,6 +817,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
