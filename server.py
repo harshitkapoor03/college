@@ -735,14 +735,14 @@ async def fetch_questions(
 # Answer question tool
 AnswerQuestionDescription = RichToolDescription(
     description="Submits an answer for the current question.",
-    use_when="When a user answers a question.",
+    use_when="When a user answers a question with 1-4 or a-d.",
     side_effects="Updates the user's score.",
 )
 
 @mcp.tool(description=AnswerQuestionDescription.model_dump_json())
 async def answer_question(
     puch_user_id: Annotated[str, Field(description="Puch User Unique Identifier")],
-    answer: Annotated[int, Field(description="Answer index (1-4)")]
+    answer: Annotated[int, Field(description="Answer index (1-4) or (a-d)")]
 ) -> list[TextContent]:
     try:
         user_data = _get_user_data(puch_user_id)
@@ -773,7 +773,7 @@ async def answer_question(
 # Submit college tool
 SubmitCollegeDescription = RichToolDescription(
     description="Submits the user's college for the competition.",
-    use_when="When a user starts the competition and their college is not specified.",
+    use_when="When a user starts the quiz before starting to fetch the questions run this and store the users college before fetching questions for user.",
     side_effects="Associates the user with a college.",
 )
 
@@ -812,6 +812,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
