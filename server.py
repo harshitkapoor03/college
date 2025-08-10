@@ -893,7 +893,7 @@ async def crypto_last_10h(
 
         return [
             TextContent(type="text", text=table_text),
-            ImageContent(type="image/png", data=img_b64)
+            ImageContent(type="image", mimeType="image/png", data=img_b64)
         ]
 
     except Exception as e:
@@ -906,6 +906,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
