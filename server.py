@@ -828,76 +828,198 @@ from typing import Annotated
 from mcp.types import TextContent, ImageContent
 from pydantic import Field
 
-@mcp.tool(description="Fetch last 10 hours of price data for a crypto token and generate a chart.")
-async def crypto_last_10h(
-    token_id: Annotated[str, Field(description="The CoinGecko token ID (e.g., 'bitcoin', 'dogecoin')")],
-    currency: Annotated[str, Field(description="Currency for prices, e.g., 'usd', 'inr")] = "usd"
-) -> list:
-    try:
-        now = int(time.time())
-        ten_hours_ago = now - (10 * 60 * 60)
+# @mcp.tool(description="Fetch last 10 hours of price data for a crypto token and generate a chart.")
+# async def crypto_last_10h(
+#     token_id: Annotated[str, Field(description="The CoinGecko token ID (e.g., 'bitcoin', 'dogecoin')")],
+#     currency: Annotated[str, Field(description="Currency for prices, e.g., 'usd', 'inr")] = "usd"
+# ) -> list:
+#     try:
+#         now = int(time.time())
+#         ten_hours_ago = now - (10 * 60 * 60)
 
-        url = f"https://api.coingecko.com/api/v3/coins/{token_id}/market_chart/range"
+#         url = f"https://api.coingecko.com/api/v3/coins/{token_id}/market_chart/range"
+#         params = {
+#             "vs_currency": currency,
+#             "from": ten_hours_ago,
+#             "to": now
+#         }
+
+#         res = requests.get(url, params=params)
+#         res.raise_for_status()
+#         data = res.json()
+
+#         timestamps = [p[0] / 1000 for p in data["prices"]]
+#         prices = [p[1] for p in data["prices"]]
+
+#         offset = datetime.timedelta(hours=5, minutes=30)
+#         times = [datetime.datetime.fromtimestamp(ts) + offset for ts in timestamps]
+
+#         hourly_times, hourly_prices, seen_hours = [], [], set()
+#         for t, price in zip(times, prices):
+#             hour_key = t.replace(minute=0, second=0, microsecond=0)
+#             if hour_key not in seen_hours:
+#                 seen_hours.add(hour_key)
+#                 hourly_times.append(hour_key.strftime("%I:%M %p"))
+#                 hourly_prices.append(price)
+
+#         if len(hourly_prices) >= 2:
+#             start_price = hourly_prices[0]
+#             end_price = hourly_prices[-1]
+#             percent_change = ((end_price - start_price) / start_price) * 100
+#         else:
+#             percent_change = 0
+
+#         # Save chart as PNG
+#         chart_path = f"/tmp/{token_id}_last_10h.png"
+#         plt.plot(hourly_times, hourly_prices, marker='o', color='blue')
+#         plt.xticks(rotation=45)
+#         plt.title(f"{token_id.capitalize()} Price (Last 10 Hours)\nChange: {percent_change:+.2f}%")
+#         plt.xlabel("Time (IST)")
+#         plt.ylabel(f"Price ({currency.upper()})")
+#         plt.grid(True)
+#         plt.tight_layout()
+#         plt.savefig(chart_path)
+#         plt.close()
+
+#         # Encode PNG to base64
+#         with open(chart_path, "rb") as f:
+#             img_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+#         # Build text table
+#         table_text = "\nHourly Prices (Last 10 Hours):\n"
+#         for t_str, price in zip(hourly_times, hourly_prices):
+#             table_text += f"{t_str}  ->  {currency.upper()} {price:,.2f}\n"
+#         table_text += f"\nPercentage Change: {percent_change:+.2f}%"
+
+#         return [
+#             TextContent(type="text", text=table_text),
+#             ImageContent(type="image", mimeType="image/png", data=img_b64)
+#         ]
+
+#     except Exception as e:
+#         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
+import requests
+import datetime
+import time
+import io
+import base64
+import matplotlib.pyplot as plt
+from typing import Annotated
+from fastmcp import mcp, Field, TextContent, ImageContent, McpError, ErrorData, INTERNAL_ERROR
+
+@mcp.tool(description="Fetch historical cryptocurrency prices from CoinGecko for a given coin, currency, time period, and interval; returns a formatted price table, percentage change, and an IST-based time series chart.")
+async def crypto_time_series(
+    coin_id: Annotated[str, Field(description="CoinGecko coin ID, e.g., 'bitcoin', 'ethereum', 'solana'")],
+    currency: Annotated[str, Field(description="Target currency, e.g., 'usd', 'inr'")] = "inr",
+    period_hours: Annotated[int, Field(description="How many past hours to fetch")] = 10,
+    interval: Annotated[str, Field(description="Data interval: 'minute' or 'hour'")] = "minute",
+) -> list:
+    """
+    Returns:
+      - TextContent: a formatted table of timestamps (IST) and prices + % change
+      - ImageContent: PNG chart encoded base64
+    """
+    try:
+        # Calculate UNIX timestamps
+        now = int(time.time())
+        start_time = now - ((period_hours - 1) * 60 * 60)
+
+        # Fetch from CoinGecko
+        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart/range"
         params = {
             "vs_currency": currency,
-            "from": ten_hours_ago,
+            "from": start_time,
             "to": now
         }
 
         res = requests.get(url, params=params)
-        res.raise_for_status()
-        data = res.json()
+        if res.status_code != 200:
+            raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Error fetching data: {res.status_code}"))
 
-        timestamps = [p[0] / 1000 for p in data["prices"]]
+        data = res.json()
+        if "prices" not in data or not data["prices"]:
+            raise McpError(ErrorData(code=INTERNAL_ERROR, message="No price data returned from CoinGecko"))
+
+        # Extract data
+        timestamps = [p[0] / 1000 for p in data["prices"]]  # ms → s
         prices = [p[1] for p in data["prices"]]
 
-        offset = datetime.timedelta(hours=5, minutes=30)
-        times = [datetime.datetime.fromtimestamp(ts) + offset for ts in timestamps]
+        # Add IST offset
+        ist_offset = datetime.timedelta(hours=5, minutes=30)
+        times = [datetime.datetime.fromtimestamp(ts) + ist_offset for ts in timestamps]
 
-        hourly_times, hourly_prices, seen_hours = [], [], set()
-        for t, price in zip(times, prices):
-            hour_key = t.replace(minute=0, second=0, microsecond=0)
-            if hour_key not in seen_hours:
-                seen_hours.add(hour_key)
-                hourly_times.append(hour_key.strftime("%I:%M %p"))
-                hourly_prices.append(price)
-
-        if len(hourly_prices) >= 2:
-            start_price = hourly_prices[0]
-            end_price = hourly_prices[-1]
-            percent_change = ((end_price - start_price) / start_price) * 100
+        # Filter if hourly
+        if interval == "hour":
+            filtered_times, filtered_prices = [], []
+            seen_hours = set()
+            for t, price in zip(times, prices):
+                hour_key = t.replace(minute=0, second=0, microsecond=0)
+                if hour_key not in seen_hours:
+                    seen_hours.add(hour_key)
+                    filtered_times.append(hour_key.strftime("%d-%b %I:%M %p"))
+                    filtered_prices.append(price)
         else:
-            percent_change = 0
+            filtered_times = [t.strftime("%d-%b %I:%M %p") for t in times]
+            filtered_prices = prices
 
-        # Save chart as PNG
-        chart_path = f"/tmp/{token_id}_last_10h.png"
-        plt.plot(hourly_times, hourly_prices, marker='o', color='blue')
-        plt.xticks(rotation=45)
-        plt.title(f"{token_id.capitalize()} Price (Last 10 Hours)\nChange: {percent_change:+.2f}%")
+        # Compute percent change
+        start_price = filtered_prices[0]
+        end_price = filtered_prices[-1]
+        percent_change = ((end_price - start_price) / start_price) * 100
+
+        # X-axis ticks
+        max_labels = 20
+        n = len(filtered_times)
+        if n > max_labels:
+            step = max(1, n // max_labels)
+            x_ticks = list(range(0, n, step))
+            if x_ticks[-1] != n - 1:
+                x_ticks.append(n - 1)
+        else:
+            x_ticks = list(range(n))
+
+        # Plot chart
+        plt.figure(figsize=(10, 5))
+        color = "green" if percent_change >= 0 else "red"
+        plt.plot(filtered_times, filtered_prices, marker='o', color=color, linewidth=1.5, markersize=4)
+        plt.xticks(x_ticks, [filtered_times[i] for i in x_ticks], rotation=45, ha='right')
+        plt.title(f"{coin_id.capitalize()} Price\nPeriod: {period_hours}h | Interval: {interval} | Change: {percent_change:+.2f}%",
+                  fontsize=12, fontweight='bold')
         plt.xlabel("Time (IST)")
         plt.ylabel(f"Price ({currency.upper()})")
-        plt.grid(True)
+        plt.grid(True, alpha=0.25)
         plt.tight_layout()
-        plt.savefig(chart_path)
-        plt.close()
 
-        # Encode PNG to base64
-        with open(chart_path, "rb") as f:
-            img_b64 = base64.b64encode(f.read()).decode("utf-8")
+        # Encode PNG
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", dpi=200, bbox_inches='tight')
+        plt.close()
+        buf.seek(0)
+        img_b64 = base64.b64encode(buf.read()).decode("utf-8")
 
         # Build text table
-        table_text = "\nHourly Prices (Last 10 Hours):\n"
-        for t_str, price in zip(hourly_times, hourly_prices):
-            table_text += f"{t_str}  ->  {currency.upper()} {price:,.2f}\n"
-        table_text += f"\nPercentage Change: {percent_change:+.2f}%"
+        table_lines = [
+            f"{coin_id.capitalize()} Prices — Period: {period_hours}h, Interval: {interval}",
+            "=" * 60
+        ]
+        for t, p in zip(filtered_times, filtered_prices):
+            table_lines.append(f"{t}  ->  {currency.upper()} {p:,.2f}")
+        table_lines.append("=" * 60)
+        table_lines.append(f"Percentage Change: {percent_change:+.2f}%")
+        table_lines.append(f"Total Data Points: {len(filtered_prices)}")
+
+        table_text = "\n".join(table_lines)
 
         return [
             TextContent(type="text", text=table_text),
             ImageContent(type="image", mimeType="image/png", data=img_b64)
         ]
 
+    except McpError:
+        raise
     except Exception as e:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
+
 #####______________________________________________________________________________________________________________________________________________
 
 import base64
@@ -1044,6 +1166,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
