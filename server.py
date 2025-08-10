@@ -607,48 +607,12 @@ async def vintage_photo_filter(
 #             resp = await client.post(API_URL, headers=headers, data=data)
 #             resp.raise_for_status()
 #             return resp.json()
-@mcp.tool(description="Get daily horoscope")
-async def horoscope(
-    sign: Annotated[str, Field(description="Zodiac sign (e.g., 'aries', 'leo')")],
-    lang: Annotated[str, Field(description="Language code (e.g., 'en')")] = "en",
-    type_: Annotated[str, Field(description="Horoscope type (e.g., 'daily')")] = "daily",
-    timezone: Annotated[str, Field(description="Timezone (e.g., 'UTC')")] = "UTC"
-) -> str:
-    """
-    Get daily horoscope for a given sign from the Astropredict API via RapidAPI.
-    """
-    import httpx
-    import os
-
-    API_KEY = "7bd7d59100msha77016cf106a0aap196edejsnabf8fbb51149"  # store key in environment variables
-    API_URL = "https://astropredict-daily-horoscopes-lucky-insights.p.rapidapi.com/horoscope"
-
-    headers = {
-        "x-rapidapi-key": API_KEY,
-        "x-rapidapi-host": "astropredict-daily-horoscopes-lucky-insights.p.rapidapi.com"
-    }
-    params = {
-        "lang": lang,
-        "zodiac": sign.lower(),
-        "type": type_,
-        "timezone": timezone
-    }
-    data="uunavailable rn"
-
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.get(API_URL, headers=headers, params=params)
-        resp.raise_for_status()
-        data = resp.json()
-
-    # The API returns multiple fields — adjust as needed
-    # Assuming the main horoscope text is in "prediction" or similar
-    return data.get("horoscope", "No prediction available.")
 # @mcp.tool(description="Get daily horoscope")
 # async def horoscope(
 #     sign: Annotated[str, Field(description="Zodiac sign (e.g., 'aries', 'leo')")],
-#     #lang: Annotated[str, Field(description="Language code (e.g., 'en')")] = "en",
-#     # day: Annotated[str, Field(description="Horoscope type (e.g., 'daily')")] = "daily",
-#     # timezone: Annotated[str, Field(description="Timezone (e.g., 'UTC')")] = "UTC"
+#     lang: Annotated[str, Field(description="Language code (e.g., 'en')")] = "en",
+#     type_: Annotated[str, Field(description="Horoscope type (e.g., 'daily')")] = "daily",
+#     timezone: Annotated[str, Field(description="Timezone (e.g., 'UTC')")] = "UTC"
 # ) -> str:
 #     """
 #     Get daily horoscope for a given sign from the Astropredict API via RapidAPI.
@@ -657,15 +621,19 @@ async def horoscope(
 #     import os
 
 #     API_KEY = "7bd7d59100msha77016cf106a0aap196edejsnabf8fbb51149"  # store key in environment variables
-#     API_URL = "https://horoscope-daily-api2.p.rapidapi.com/get-horoscope"
+#     API_URL = "https://astropredict-daily-horoscopes-lucky-insights.p.rapidapi.com/horoscope"
 
 #     headers = {
 #         "x-rapidapi-key": API_KEY,
-#         "x-rapidapi-host": "horoscope-daily-api2.p.rapidapi.com"
+#         "x-rapidapi-host": "astropredict-daily-horoscopes-lucky-insights.p.rapidapi.com"
 #     }
 #     params = {
-#         "zodiacSign":sign,"day":"today"
+#         "lang": lang,
+#         "zodiac": sign.lower(),
+#         "type": type_,
+#         "timezone": timezone
 #     }
+#     data="uunavailable rn"
 
 #     async with httpx.AsyncClient(timeout=10.0) as client:
 #         resp = await client.get(API_URL, headers=headers, params=params)
@@ -674,8 +642,40 @@ async def horoscope(
 
 #     # The API returns multiple fields — adjust as needed
 #     # Assuming the main horoscope text is in "prediction" or similar
-#     # return data.get("prediction", "No prediction available.")
-#     return data
+#     return data.get("horoscope", "No prediction available.")
+@mcp.tool(description="Get daily horoscope")
+async def horoscope(
+    sign: Annotated[str, Field(description="Zodiac sign (e.g., 'aries', 'leo')")],
+    #lang: Annotated[str, Field(description="Language code (e.g., 'en')")] = "en",
+    # day: Annotated[str, Field(description="Horoscope type (e.g., 'daily')")] = "daily",
+    # timezone: Annotated[str, Field(description="Timezone (e.g., 'UTC')")] = "UTC"
+) -> str:
+    """
+    Get daily horoscope for a given sign from the Astropredict API via RapidAPI.
+    """
+    import httpx
+    import os
+
+    API_KEY = "7bd7d59100msha77016cf106a0aap196edejsnabf8fbb51149"  # store key in environment variables
+    API_URL = "https://horoscope-daily-api2.p.rapidapi.com/get-horoscope"
+
+    headers = {
+        "x-rapidapi-key": API_KEY,
+        "x-rapidapi-host": "horoscope-daily-api2.p.rapidapi.com"
+    }
+    params = {
+        "zodiacSign":sign,"day":"today"
+    }
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(API_URL, headers=headers, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+
+    # The API returns multiple fields — adjust as needed
+    # Assuming the main horoscope text is in "prediction" or similar
+    # return data.get("prediction", "No prediction available.")
+    return data.get("horoscope", "No prediction available.")
 # --- Run server ---
 async def main():
     print("🚀 Starting MCP server on http://0.0.0.0:8086")
@@ -683,6 +683,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
