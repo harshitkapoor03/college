@@ -697,9 +697,9 @@ class RichToolDescription(BaseModel):
     use_when: str
     side_effects: str | None = None
 
-# Global user data storage
-USER_DATA: dict[str, dict] = {}
-COLLEGE_SCORES: dict[str, int] = {}
+# # Global user data storage
+# USER_DATA: dict[str, dict] = {}
+# COLLEGE_SCORES: dict[str, int] = {}
 
 def _get_user_data(puch_user_id: str) -> dict:
     if not puch_user_id:
@@ -711,8 +711,8 @@ def _error(code, msg):
 
 # Fetch questions from Open Trivia Database
 FetchQuestionsDescription = RichToolDescription(
-    description="Fetches 5 easy multiple-choice questions from Open Trivia Database and gives to users with options.",
-    use_when="When a new quiz session is started.",
+    description="Fetches 1 medium multiple-choice questions from Open Trivia Database and gives to users with options.",
+    use_when="When a new quiz session is started or user asks for trivia questions or to enter a quiz.",
     side_effects="None",
 )
 
@@ -721,93 +721,93 @@ async def fetch_questions(
     puch_user_id: Annotated[str, Field(description="Puch User Unique Identifier")]
 ) -> list[TextContent]:
     try:
-        response = requests.get("https://opentdb.com/api.php?amount=5&difficulty=easy&type=multiple")
+        response = requests.get("https://opentdb.com/api.php?amount=1&difficulty=medium&type=multiple")
         response.raise_for_status()
         questions = response.json().get("results", [])
-        user_data = _get_user_data(puch_user_id)
-        user_data['questions'] = questions
-        user_data['current_question'] = 0
-        user_data['score'] = 0
+        # user_data = _get_user_data(puch_user_id)
+        # user_data['questions'] = questions
+        # user_data['current_question'] = 0
+        # user_data['score'] = 0
         return [TextContent(type="text", text=json.dumps(questions))]
     except Exception as e:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
-# Answer question tool
-AnswerQuestionDescription = RichToolDescription(
-    description="Submits an answer for the current question.",
-    use_when="When a user answers a question with one of the options provided in the question asked most recently.",
-    side_effects="Updates the user's score.",
-)
+# # Answer question tool
+# AnswerQuestionDescription = RichToolDescription(
+#     description="Submits an answer for the current question.",
+#     use_when="When a user answers a question with one of the options provided in the question asked most recently.",
+#     side_effects="Updates the user's score.",
+# )
 
-@mcp.tool(description=AnswerQuestionDescription.model_dump_json())
-async def answer_question(
-    puch_user_id: Annotated[str, Field(description="Puch User Unique Identifier")],
-    answer: Annotated[int, Field(description="Answer of the latest question a string if option d was choses and it was d.june the answer will be june and will be stored in this variableo")]
-) -> list[TextContent]:
-    try:
-        user_data = _get_user_data(puch_user_id)
-        questions = user_data.get('questions', [])
-        current_question = user_data.get('current_question', 1)
+# @mcp.tool(description=AnswerQuestionDescription.model_dump_json())
+# async def answer_question(
+#     puch_user_id: Annotated[str, Field(description="Puch User Unique Identifier")],
+#     answer: Annotated[int, Field(description="Answer of the latest question a string if option d was choses and it was d.june the answer will be june and will be stored in this variableo")]
+# ) -> list[TextContent]:
+#     try:
+#         user_data = _get_user_data(puch_user_id)
+#         questions = user_data.get('questions', [])
+#         current_question = user_data.get('current_question', 1)
         
-        if current_question >= len(questions):
-            return [TextContent(type="text", text="No more questions available.")]
+#         if current_question >= len(questions):
+#             return [TextContent(type="text", text="No more questions available.")]
         
-        correct_answer = questions[current_question-1]['correct_answer']
-        answer=answer.lower()
-        correct_answer=correct_answer.lower()
-        if answer== correct_answer:
-            user_data['score'] += 10
+#         correct_answer = questions[current_question-1]['correct_answer']
+#         answer=answer.lower()
+#         correct_answer=correct_answer.lower()
+#         if answer== correct_answer:
+#             user_data['score'] += 10
             
         
-        user_data['current_question'] += 1
-        # Check if quiz is complete
-        if user_data['current_question'] >= len(questions):
-            college = user_data.get('college')
-            if college:
-                COLLEGE_SCORES[college] = COLLEGE_SCORES.get(college, 0) + user_data['score']
-                return [TextContent(type="text", text=f"Quiz complete! Final score: {user_data['score']}. Added to {college} total.")]
-            else:
-                return [TextContent(type="text", text=f"Your current score is {user_data['score']}. Enter your college name when you enter the quiz next time if you want to contribute to it winning!")]
+#         user_data['current_question'] += 1
+#         # Check if quiz is complete
+#         if user_data['current_question'] >= len(questions):
+#             college = user_data.get('college')
+#             if college:
+#                 COLLEGE_SCORES[college] = COLLEGE_SCORES.get(college, 0) + user_data['score']
+#                 return [TextContent(type="text", text=f"Quiz complete! Final score: {user_data['score']}. Added to {college} total.")]
+#             else:
+#                 return [TextContent(type="text", text=f"Your current score is {user_data['score']}. Enter your college name when you enter the quiz next time if you want to contribute to it winning!")]
 
-        return [TextContent(type="text", text=f"Your current score is {user_data['score']}")]
-    except Exception as e:
-        raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
+#         return [TextContent(type="text", text=f"Your current score is {user_data['score']}")]
+#     except Exception as e:
+#         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
-# Submit college tool
-SubmitCollegeDescription = RichToolDescription(
-    description="Submits the user's college for the competition.",
-    use_when="When a user starts the quiz before starting to fetch the questions run this and store the users college before fetching questions for user.",
-    side_effects="Associates the user with a college.",
-)
+# # Submit college tool
+# SubmitCollegeDescription = RichToolDescription(
+#     description="Submits the user's college for the competition.",
+#     use_when="When a user starts the quiz before starting to fetch the questions run this and store the users college before fetching questions for user.",
+#     side_effects="Associates the user with a college.",
+# )
 
-@mcp.tool(description=SubmitCollegeDescription.model_dump_json())
-async def submit_college(
-    puch_user_id: Annotated[str, Field(description="Puch User Unique Identifier")],
-    college_name: Annotated[str, Field(description="Name of the college")]
-) -> list[TextContent]:
-    try:
-        user_data = _get_user_data(puch_user_id)
-        user_data['college'] = college_name
-        return [TextContent(type="text", text=f"College {college_name} registered successfully.")]
-    except Exception as e:
-        raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
+# @mcp.tool(description=SubmitCollegeDescription.model_dump_json())
+# async def submit_college(
+#     puch_user_id: Annotated[str, Field(description="Puch User Unique Identifier")],
+#     college_name: Annotated[str, Field(description="Name of the college")]
+# ) -> list[TextContent]:
+#     try:
+#         user_data = _get_user_data(puch_user_id)
+#         user_data['college'] = college_name
+#         return [TextContent(type="text", text=f"College {college_name} registered successfully.")]
+#     except Exception as e:
+#         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
-# Leaderboard tool
-LeaderboardDescription = RichToolDescription(
-    description="Displays the current leaderboard with college scores.",
-    use_when="When a user requests to see the leaderboard.",
-    side_effects="None",
-)
+# # Leaderboard tool
+# LeaderboardDescription = RichToolDescription(
+#     description="Displays the current leaderboard with college scores.",
+#     use_when="When a user requests to see the leaderboard.",
+#     side_effects="None",
+# )
 
-@mcp.tool(description=LeaderboardDescription.model_dump_json())
-async def leaderboard(
-    puch_user_id: Annotated[str, Field(description="Puch User Unique Identifier")]
-) -> list[TextContent]:
-    try:
-        leaderboard_data = sorted(COLLEGE_SCORES.items(), key=lambda x: x[1], reverse=True)
-        return [TextContent(type="text", text=json.dumps(leaderboard_data))]
-    except Exception as e:
-        raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
+# @mcp.tool(description=LeaderboardDescription.model_dump_json())
+# async def leaderboard(
+#     puch_user_id: Annotated[str, Field(description="Puch User Unique Identifier")]
+# ) -> list[TextContent]:
+#     try:
+#         leaderboard_data = sorted(COLLEGE_SCORES.items(), key=lambda x: x[1], reverse=True)
+#         return [TextContent(type="text", text=json.dumps(leaderboard_data))]
+#     except Exception as e:
+#         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 # --- Run server ---
 async def main():
     print("🚀 Starting MCP server on http://0.0.0.0:8086")
