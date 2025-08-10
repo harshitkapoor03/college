@@ -642,7 +642,7 @@ async def horoscope(
 
     # The API returns multiple fields — adjust as needed
     # Assuming the main horoscope text is in "prediction" or similar
-    return data.get("prediction", "No prediction available.")
+    return data.get("horoscope", "No prediction available.")
 # @mcp.tool(description="Get daily horoscope")
 # async def horoscope(
 #     sign: Annotated[str, Field(description="Zodiac sign (e.g., 'aries', 'leo')")],
@@ -683,6 +683,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
