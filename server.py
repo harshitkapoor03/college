@@ -719,7 +719,7 @@ FetchQuestionsDescription = RichToolDescription(
 @mcp.tool(description=FetchQuestionsDescription.model_dump_json())
 async def fetch_trivia(
     puch_user_id: Annotated[str, Field(description="Puch User Unique Identifier")]
-) -> list[TextContent]:
+) -> str:
     try:
         response = requests.get("https://opentdb.com/api.php?amount=1&difficulty=medium&type=multiple")
         response.raise_for_status()
@@ -817,6 +817,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
