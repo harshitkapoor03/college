@@ -711,8 +711,8 @@ def _error(code, msg):
 
 # Fetch questions from Open Trivia Database
 FetchQuestionsDescription = RichToolDescription(
-    description="Fetches 5 easy multiple-choice questions from Open Trivia Database and gives to users with options 1-4.",
-    use_when="When a new quiz session is started.",
+    description="Fetches 1 easy multiple-choice questions from Open Trivia Database and gives to users with options give the questions one by one only.",
+    use_when="When a new quiz session is started or user answers one question and is withing total 5 questions.",
     side_effects="None",
 )
 
@@ -721,7 +721,7 @@ async def fetch_questions(
     puch_user_id: Annotated[str, Field(description="Puch User Unique Identifier")]
 ) -> list[TextContent]:
     try:
-        response = requests.get("https://opentdb.com/api.php?amount=5&difficulty=easy&type=multiple")
+        response = requests.get("https://opentdb.com/api.php?amount=1&difficulty=easy&type=multiple")
         response.raise_for_status()
         questions = response.json().get("results", [])
         user_data = _get_user_data(puch_user_id)
@@ -742,7 +742,7 @@ AnswerQuestionDescription = RichToolDescription(
 @mcp.tool(description=AnswerQuestionDescription.model_dump_json())
 async def answer_question(
     puch_user_id: Annotated[str, Field(description="Puch User Unique Identifier")],
-    answer: Annotated[int, Field(description="Answer of the latest question a string which has one of the options of the latest question")]
+    answer: Annotated[int, Field(description="full Answer of the latest question a string which has one of the options of the latest question not the option number but what the option is")]
 ) -> list[TextContent]:
     try:
         user_data = _get_user_data(puch_user_id)
@@ -755,7 +755,7 @@ async def answer_question(
         correct_answer = questions[current_question-1]['correct_answer']
         if answer== correct_answer:
             user_data['score'] += 10
-            
+
         
         user_data['current_question'] += 1
         # Check if quiz is complete
