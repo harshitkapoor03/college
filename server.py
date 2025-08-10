@@ -711,7 +711,7 @@ def _error(code, msg):
 
 # Fetch questions from Open Trivia Database
 FetchQuestionsDescription = RichToolDescription(
-    description="Fetches 5 easy multiple-choice questions from Open Trivia Database.",
+    description="Fetches 5 easy multiple-choice questions from Open Trivia Database and gives to users with options 1-4.",
     use_when="When a new quiz session is started.",
     side_effects="None",
 )
@@ -735,14 +735,14 @@ async def fetch_questions(
 # Answer question tool
 AnswerQuestionDescription = RichToolDescription(
     description="Submits an answer for the current question.",
-    use_when="When a user answers a question with 1-4 or a-d.",
+    use_when="When a user answers a question with one of the options provided in the question asked most recently.",
     side_effects="Updates the user's score.",
 )
 
 @mcp.tool(description=AnswerQuestionDescription.model_dump_json())
 async def answer_question(
     puch_user_id: Annotated[str, Field(description="Puch User Unique Identifier")],
-    answer: Annotated[int, Field(description="Answer index (1-4) or (a-d)")]
+    answer: Annotated[int, Field(description="Answer of the latest question a string which has one of the options of the latest question")]
 ) -> list[TextContent]:
     try:
         user_data = _get_user_data(puch_user_id)
@@ -752,9 +752,10 @@ async def answer_question(
         if current_question >= len(questions):
             return [TextContent(type="text", text="No more questions available.")]
         
-        correct_answer = questions[current_question]['correct_answer']
-        if questions[current_question]['incorrect_answers'][answer - 1] == correct_answer:
+        correct_answer = questions[current_question-1]['correct_answer']
+        if answer== correct_answer:
             user_data['score'] += 10
+            
         
         user_data['current_question'] += 1
         # Check if quiz is complete
