@@ -819,6 +819,92 @@ async def fetch_trivia(
 #         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
 #------------------------------------------------------------------$------------------------------------------------------------------------------Resume tool-----------------
+import requests
+import time
+import datetime
+import matplotlib.pyplot as plt
+import os
+from typing import Annotated
+from mcp.types import TextContent, BlobContent
+from fastmcp import FastMCP
+from mcp import ErrorData, McpError
+from mcp.types import INTERNAL_ERROR
+from pydantic import Field
+
+# Example: keep your MCP instance from before
+# mcp = FastMCP("Crypto Tracker Server", auth=...)
+
+@mcp.tool(description="Fetch last 10 hours of price data for a crypto token and generate a chart.")
+async def crypto_last_10h(
+    token_id: Annotated[str, Field(description="The CoinGecko token ID (e.g., 'bitcoin', 'dogecoin')")],
+    currency: Annotated[str, Field(description="Currency for prices, e.g., 'usd', 'inr')] = "usd"
+) -> list:
+    try:
+        now = int(time.time())
+        ten_hours_ago = now - (10 * 60 * 60)
+
+        url = f"https://api.coingecko.com/api/v3/coins/{token_id}/market_chart/range"
+        params = {
+            "vs_currency": currency,
+            "from": ten_hours_ago,
+            "to": now
+        }
+
+        res = requests.get(url, params=params)
+        res.raise_for_status()
+        data = res.json()
+
+        # Extract timestamps & prices
+        timestamps = [p[0] / 1000 for p in data["prices"]]
+        prices = [p[1] for p in data["prices"]]
+
+        # IST offset
+        offset = datetime.timedelta(hours=5, minutes=30)
+        times = [datetime.datetime.fromtimestamp(ts) + offset for ts in timestamps]
+
+        # Filter to one per hour
+        hourly_times, hourly_prices, seen_hours = [], [], set()
+        for t, price in zip(times, prices):
+            hour_key = t.replace(minute=0, second=0, microsecond=0)
+            if hour_key not in seen_hours:
+                seen_hours.add(hour_key)
+                hourly_times.append(hour_key.strftime("%I:%M %p"))
+                hourly_prices.append(price)
+
+        # % change
+        if len(hourly_prices) >= 2:
+            start_price = hourly_prices[0]
+            end_price = hourly_prices[-1]
+            percent_change = ((end_price - start_price) / start_price) * 100
+        else:
+            percent_change = 0
+
+        # Plot
+        chart_path = f"/tmp/{token_id}_last_10h.png"
+        plt.plot(hourly_times, hourly_prices, marker='o', color='blue')
+        plt.xticks(rotation=45)
+        plt.title(f"{token_id.capitalize()} Price (Last 10 Hours)\nChange: {percent_change:+.2f}%")
+        plt.xlabel("Time (IST)")
+        plt.ylabel(f"Price ({currency.upper()})")
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(chart_path)
+        plt.close()
+
+        # Prepare table text
+        table_text = "\nHourly Prices (Last 10 Hours):\n"
+        for t_str, price in zip(hourly_times, hourly_prices):
+            table_text += f"{t_str}  ->  {currency.upper()} {price:,.2f}\n"
+        table_text += f"\nPercentage Change: {percent_change:+.2f}%"
+
+        # Return both table and chart
+        return [
+            TextContent(type="text", text=table_text),
+            BlobContent(type="image/png", data=open(chart_path, "rb").read())
+        ]
+
+    except Exception as e:
+        raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
 # --- Run server ---
 async def main():
@@ -827,6 +913,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
