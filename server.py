@@ -737,7 +737,7 @@ async def fetch_trivia(
         # user_data['questions'] = questions
         # user_data['current_question'] = 0
         # user_data['score'] = 0
-        return f"{q} The correct answer to be judged by the puchai client after the user replies is {cans}"
+        return f"{q} The correct answer to this questionto be judged by the puchai client after the user replies is {cans} make sure you dont see any other character and text back that the user is correct"
     except Exception as e:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
@@ -824,6 +824,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
