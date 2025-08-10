@@ -136,7 +136,7 @@ import matplotlib.pyplot as plt
 
 @mcp.tool(description="- Fetch historical cryptocurrency prices from CoinGecko for a given coin, currency, time period, and interval;\n-Returns a formatted price table, percentage change, and an IST-based time series chart.")
 async def crypto_time_series(
-    coin_id: Annotated[str, Field(description="CoinGecko coin ID, e.g., 'bitcoin', 'ethereum', 'solana'")],
+    coin_id: Annotated[str, Field(description="CoinGecko coin ID, e.g., 'bitcoin', 'ethereum', 'solana','USDT','BTC','ETH','USDC','FDUSD','SOL','XRP','DOGE','BSC-USD','LINK','ENA','ADA','SOL','SUI','BNB','PROVE','WETH','LTC','WETH','PEPE','TRX','UNI','PENGU','AVAX','WETH','GMX','BONK','LDO','AAVE','APT','CBBTC','USD1','USDE','ARB','TRUMP','WBNB','XLM','HBAR','BCH','SOON','USDT0','WIF','DOT','TREE','RAY','OP','BIO','SHIB','WBTC','NEAR','PI','USDC','MNT','HYPE','AERO','CRV','ENS','FIL','TON','OIK','ETC','FARTCOIN','PUMP','RLUSD','ONDO','ZORA','WLD','VIRTUAL','PENDLE','ZKJ','ZRO','SEI','MAGIC','CFX','WBTC','S','ETHFI','FLOKI','ANI','GALA','WHYPE','INJ','SPK','POL','TIA','DAI','XMR','HFT','JUP','OG','PNUT','TAO','ALGO','ATOM','MEMEFI','CAKE','RUNE','STRIKE','NEIRO','ERA','AICELL','WTRX','SAHARA','TOWNS','BSV','FIR','WAL','ICP','RENDER','FET','MOODENG','EIGEN','UBTC','ULTI','IP','METIS','BTCB','BGB','WSTETH','MKR','G7','SBUSDT','EGL1','COMP','BTC.B','JUV','APEPE','OM','SPX','USELESS','ORDI','AI16Z','SYRUP','XTZ','KAS','REZ','OMNI','FTN','A2Z','WETH','GLM','RSR','DIA','BMT','WAVAX','UETH','IMX','AIXBT','SAGA','W','DOLO','MEW','STETH','HEI','CUDIS','ARKM','SUSHI','JLP','KOGE','SAND','STX','COW','VET','ASR','A','PEOPLE','SANTOS','AR','HYPER','JASMY','XDC','POPCAT','JST','LIORA','RED','WBTC','LAYER','GRT','C','EURC','MYX','ZEC','FRAX','TURBO','VINE','WETH','JTO','DAI','THETA','BABY','YFI','BR','SQD','INIT','LA','BERA','KERNEL','SUSDE','PYUSD','ALT'")],
     currency: Annotated[str, Field(description="Target currency, e.g., 'usd', 'inr'")] = "inr",
     period_hours: Annotated[int, Field(description="How many past hours to fetch")] = 10,
     interval: Annotated[str, Field(description="Data interval: 'minute' or 'hour'")] = "hour",
@@ -497,6 +497,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
