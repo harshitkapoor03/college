@@ -730,7 +730,7 @@ async def fetch_trivia(
         # user_data['questions'] = questions
         # user_data['current_question'] = 0
         # user_data['score'] = 0
-        return [q+"corrects answer is"+cans]
+        return f"{q} The correct answer is {cans}"
     except Exception as e:
         raise McpError(ErrorData(code=INTERNAL_ERROR, message=str(e)))
 
@@ -817,6 +817,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
