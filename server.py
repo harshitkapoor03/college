@@ -149,7 +149,7 @@ async def crypto_time_series(
     try:
         # Calculate UNIX timestamps
         now = int(time.time())
-        start_time = now - ((period_hours - 1) * 60 * 60)
+        start_time = now - ((period_hours ) * 60 * 60)
 
         # Fetch from CoinGecko
         url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart/range"
@@ -507,6 +507,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
