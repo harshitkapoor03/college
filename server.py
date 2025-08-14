@@ -358,28 +358,65 @@ async def stock_time_series(
             times_dt.append(dt)
         
         # 2) Plot datetime axis
+        # plt.figure(figsize=(10, 5))
+        # color = "green" if percent_change >= 0 else "red"
+        # plt.plot(times_dt, prices, marker='o', color=color, linewidth=1.2, markersize=3)
+        
+        # ax = plt.gca()
+        
+        # # 3) Choose locators/formatters based on span
+        # plower = period.lower()
+        # if 'y' in plower:
+        #     # Multi-year span: one tick per year
+        #     ax.xaxis.set_major_locator(mdates.YearLocator())
+        #     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
+        #     ax.xaxis.set_minor_locator(mdates.MonthLocator(bymonth=(1,4,7,10)))
+        # elif plower.endswith('m') or (plower.rstrip('d').isdigit() and int(plower.rstrip('d')) >= 30):
+        #     # Monthly span: tick each month
+        #     ax.xaxis.set_major_locator(mdates.MonthLocator())
+        #     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b-%Y"))
+        #     ax.xaxis.set_minor_locator(mdates.WeekdayLocator(byweekday=mdates.MO))
+        # else:
+        #     # Short span: auto choose hours/days
+        #     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+        #     ax.xaxis.set_major_formatter(mdates.DateFormatter("%d-%b %H:%M"))
+        
+        # plt.title(f"{stock_symbol.upper()} ({exchange}) Price\n"
+        #           f"Period: {period} | Interval: {interval} | Change: {percent_change:+.2f}%")
+        # plt.xlabel("Time (IST)")
+        # plt.ylabel(f"Price ({currency})")
+        # plt.grid(True, which='major', alpha=0.3)
+        # plt.grid(True, which='minor', linestyle=':', alpha=0.2)
+        # plt.xticks(rotation=45, ha='right')
+        # plt.tight_layout()
+             
+        
         plt.figure(figsize=(14, 6))
         color = "green" if percent_change >= 0 else "red"
         plt.plot(times_dt, prices, marker='o', color=color, linewidth=1.2, markersize=3)
         
         ax = plt.gca()
         
-        # 3) Choose locators/formatters based on span
-        plower = period.lower()
-        if 'y' in plower:
-            # Multi-year span: one tick per year
-            ax.xaxis.set_major_locator(mdates.YearLocator())
-            ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
-            ax.xaxis.set_minor_locator(mdates.MonthLocator(bymonth=(1,4,7,10)))
-        elif plower.endswith('m') or (plower.rstrip('d').isdigit() and int(plower.rstrip('d')) >= 30):
-            # Monthly span: tick each month
-            ax.xaxis.set_major_locator(mdates.MonthLocator())
-            ax.xaxis.set_major_formatter(mdates.DateFormatter("%b-%Y"))
-            ax.xaxis.set_minor_locator(mdates.WeekdayLocator(byweekday=mdates.MO))
+        # Number of ticks you want on x-axis
+        desired_ticks = 20
+        n = len(times_dt)
+        if n <= desired_ticks:
+            tick_indices = np.arange(n)
         else:
-            # Short span: auto choose hours/days
-            ax.xaxis.set_major_locator(mdates.AutoDateLocator())
-            ax.xaxis.set_major_formatter(mdates.DateFormatter("%d-%b %H:%M"))
+            step = n // desired_ticks
+            tick_indices = list(range(0, n, step))
+            # Ensure last point is included
+            if tick_indices[-1] != n - 1:
+                tick_indices.append(n - 1)
+        
+        # Set custom ticks and labels
+        ticks = [times_dt[i] for i in tick_indices]
+        
+        # Format tick labels as "YYYY-MM-DD"
+        tick_labels = [dt.strftime("%Y-%m-%d") for dt in ticks]
+        
+        ax.set_xticks(ticks)
+        ax.set_xticklabels(tick_labels, rotation=45, ha='right')
         
         plt.title(f"{stock_symbol.upper()} ({exchange}) Price\n"
                   f"Period: {period} | Interval: {interval} | Change: {percent_change:+.2f}%")
@@ -387,8 +424,8 @@ async def stock_time_series(
         plt.ylabel(f"Price ({currency})")
         plt.grid(True, which='major', alpha=0.3)
         plt.grid(True, which='minor', linestyle=':', alpha=0.2)
-        plt.xticks(rotation=45, ha='right')
         plt.tight_layout()
+
 
 
         # Save to buffer
@@ -553,6 +590,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
